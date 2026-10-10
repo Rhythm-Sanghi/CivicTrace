@@ -156,6 +156,11 @@ export const api = {
 
   getReports: () => request<Report[]>("/reports"),
   getMyReports: () => request<Report[]>("/reports/my"),
+  moderateReport: (reportId: string, decision: "APPROVED" | "FLAGGED" | "REJECTED", notes?: string) =>
+    request<Report>(`/reports/${reportId}/moderate`, {
+      method: "POST",
+      body: JSON.stringify({ decision, notes }),
+    }),
 
   uploadEvidence: async (reportId: string, file: File, caption?: string) => {
     const token = getAuthToken();

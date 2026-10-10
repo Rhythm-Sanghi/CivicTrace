@@ -108,7 +108,7 @@ export const NeighborhoodIntelligenceView: React.FC = () => {
       <PageHeading
         index="03"
         title="Intelligence"
-        description="Indore Central & North Ward Intelligence · Independent civic telemetry derived directly from verifiable case records. No hardcoded or self-reported government PR metrics."
+        description="Public repair and resolution patterns computed from verifiable community reports. All metrics reflect open ledger activity rather than government announcements."
       />
 
       <div className="workspace">

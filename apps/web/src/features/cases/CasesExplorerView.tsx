@@ -85,7 +85,7 @@ export const CasesExplorerView: React.FC = () => {
       <PageHeading
         index="02"
         title="Cases"
-        description="Public infrastructure records and case investigations. Public Cases Explorer · Public Infrastructure Ledger."
+        description="Public infrastructure records and local problem reports. Filter by status, search by road or neighborhood, and review public evidence dossiers."
       >
         <Link to="/report" className="button-primary">
           Report issue
