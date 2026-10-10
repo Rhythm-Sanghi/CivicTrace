@@ -71,10 +71,19 @@ class DuplicateDetectionEngine:
         text_score = jaccard_similarity(tokens_report, tokens_case)
 
         # 4. Temporal relevance
-        # Compare created_at timestamps
+        # Compare created_at timestamps safely converting to UTC
         report_dt = report.created_at
+        if report_dt and report_dt.tzinfo is None:
+            report_dt = report_dt.replace(tzinfo=timezone.utc)
         case_dt = target_case.updated_at or target_case.created_at
-        diff_days = abs((report_dt - case_dt).total_seconds()) / 86400.0
+        if case_dt and case_dt.tzinfo is None:
+            case_dt = case_dt.replace(tzinfo=timezone.utc)
+            
+        if report_dt and case_dt:
+            diff_days = abs((report_dt - case_dt).total_seconds()) / 86400.0
+        else:
+            diff_days = 0.0
+
         if diff_days <= cls.MAX_TEMPORAL_DAYS:
             temporal_score = max(0.0, 1.0 - (diff_days / cls.MAX_TEMPORAL_DAYS))
         else:

@@ -210,16 +210,41 @@ export const CaseDetailsView: React.FC = () => {
                   </button>
                 )}
 
-                {(user.role === "OPERATOR" || user.role === "ADMINISTRATOR") && caseItem.state === "ASSIGNED" && (
-                  <button
-                    onClick={async () => {
-                      await api.transitionCase(caseItem.id, "IN_PROGRESS", "Field repair operations underway");
-                      loadData();
-                    }}
-                    className="btn btn-primary btn-sm"
-                  >
-                    Start Work (In Progress)
-                  </button>
+                {(user.role === "OPERATOR" || user.role === "ADMINISTRATOR") && (caseItem.state === "ASSIGNED" || caseItem.state === "IN_PROGRESS") && (
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    {caseItem.state === "ASSIGNED" && (
+                      <button
+                        onClick={async () => {
+                          await api.transitionCase(caseItem.id, "IN_PROGRESS", "Field repair operations underway");
+                          loadData();
+                        }}
+                        className="btn btn-primary btn-sm"
+                      >
+                        Start Work (In Progress)
+                      </button>
+                    )}
+                    <button
+                      onClick={async () => {
+                        const summary = window.prompt("Work Summary:", "Completed required repair operations and electrical verification.");
+                        if (!summary) return;
+                        const actions = window.prompt("Actions Taken:", "Replaced hardware, tested electrical load, cleared site debris.");
+                        if (!actions) return;
+                        try {
+                          await api.submitResolutionClaim(caseItem.id, {
+                            work_summary: summary,
+                            actions_taken: actions,
+                          });
+                          loadData();
+                        } catch (err: any) {
+                          alert(`Error claiming resolution: ${err.message}`);
+                        }
+                      }}
+                      className="btn btn-outline btn-sm"
+                      style={{ borderColor: "var(--color-attention-orange)", color: "var(--color-attention-orange)" }}
+                    >
+                      File Resolution Claim &rarr;
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -310,12 +335,23 @@ export const CaseDetailsView: React.FC = () => {
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               {events.map((evt) => {
                 const payload = JSON.parse(evt.payload_json || "{}");
+                const borderAccent =
+                  evt.event_type.includes("DISPUTE")
+                    ? "var(--color-disputed-red)"
+                    : evt.event_type.includes("VERIFIED") || evt.event_type.includes("RESOLVED")
+                    ? "var(--color-verified-green)"
+                    : evt.event_type.includes("CLAIM")
+                    ? "var(--color-attention-orange)"
+                    : evt.event_type.includes("ASSIGN") || evt.event_type.includes("IN_PROGRESS")
+                    ? "var(--color-civic-blue)"
+                    : "var(--color-border-strong)";
+
                 return (
                   <div
                     key={evt.id}
                     className="card"
                     style={{
-                      borderLeft: "3px solid var(--color-civic-blue)",
+                      borderLeft: `4px solid ${borderAccent}`,
                       padding: "14px",
                       position: "relative",
                     }}

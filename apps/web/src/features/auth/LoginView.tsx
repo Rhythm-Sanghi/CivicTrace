@@ -18,7 +18,6 @@ export const LoginView: React.FC = () => {
     try {
       await api.login(email, password);
       navigate("/explorer");
-      window.location.reload();
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to authenticate");
       setLoading(false);

@@ -18,10 +18,11 @@ class VerificationPolicyEngine:
     1. Operators cannot verify any resolution claims (enforced conflict-of-interest boundary).
     2. Identity deduplication: a user or pseudonym cannot cast multiple votes on the same claim cycle.
     3. Contradictory dispute protection: ANY dispute (STILL_UNRESOLVED or PARTIALLY_FIXED) immediately flags the case into DISPUTED.
-    4. Quorum threshold for closure:
-       - If a Reviewer or Administrator confirms fixed, the case closes to RESOLVED immediately.
-       - If authenticated Citizens confirm fixed, at least CONFIRMATIONS_REQUIRED_FOR_AUTO_RESOLVE (default: 2) independent confirmations are required to transition to RESOLVED without reviewer override.
-       - Single citizen observations remain recorded as VERIFICATION_SUBMITTED without closing the case prematurely.
+    4. Observed Confirmation vs. Real-World Verified Identity:
+       - Pseudonymous / guest submissions are recorded as unverified field observations.
+       - Anonymous / guest confirmations cannot independently close or resolve a case; they remain logged as evidence.
+       - Auto-resolution requires authenticated Citizen accounts reaching the confirmation quorum (default: 2), or explicit Reviewer / Administrator sign-off.
+    5. Ambiguous or inconclusive observations keep the case reviewable in AWAITING_VERIFICATION rather than auto-resolving.
     """
 
     @classmethod
@@ -78,12 +79,17 @@ class VerificationPolicyEngine:
             if user and user.role in [UserRole.REVIEWER, UserRole.ADMINISTRATOR]:
                 return CaseState.RESOLVED, "RESOLUTION_VERIFIED_AND_CLOSED", actor_label
 
-            # For citizen verifications, count previous confirmed observations
+            # For unauthenticated guest observers, record the confirmation but do not count toward quorum auto-closure
+            if not user:
+                return case.state, "GUEST_VERIFICATION_LOGGED", f"Guest: {actor_label}"
+
+            # For authenticated citizen verifications, count previous confirmed observations from authenticated users
             prior_confirmations = (
                 db.query(VerificationObservation)
                 .filter(
                     VerificationObservation.case_id == case.id,
                     VerificationObservation.outcome == VerificationOutcome.CONFIRMED_FIXED,
+                    VerificationObservation.verifier_id != None,
                 )
                 .count()
             )

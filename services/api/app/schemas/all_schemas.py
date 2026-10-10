@@ -11,7 +11,7 @@ from app.models.entities import (
 
 # User schemas
 class UserBase(BaseModel):
-    email: EmailStr
+    email: str
     display_name: str
     role: UserRole = UserRole.CITIZEN
 
@@ -19,12 +19,12 @@ class UserCreate(UserBase):
     password: str
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class UserPublic(BaseModel):
     id: str
-    email: EmailStr
+    email: str
     display_name: str
     role: UserRole
     department_id: Optional[str] = None
