@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Category } from "../../lib/api";
-import { MapPin, CheckCircle, Send } from "lucide-react";
+import { MapPin, CheckCircle, Send, ArrowRight, ShieldAlert } from "lucide-react";
 
 export const ReportIssueView: React.FC = () => {
   const navigate = useNavigate();
@@ -74,45 +74,83 @@ export const ReportIssueView: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: "var(--space-8) 0" }}>
-      <div className="container" style={{ maxWidth: "760px" }}>
-        <div style={{ marginBottom: "var(--space-6)" }}>
+    <div style={{ padding: "var(--space-6) 0 var(--space-12)" }}>
+      <div className="workspace-container">
+        
+        {/* Workspace Breadcrumb & Header */}
+        <div style={{
+          borderBottom: "1px solid var(--color-border)",
+          paddingBottom: "var(--space-4)",
+          marginBottom: "var(--space-6)",
+        }}>
           <div style={{
             fontFamily: "var(--font-family-mono)",
-            fontSize: "var(--font-size-xs)",
+            fontSize: "var(--font-size-2xs)",
             color: "var(--color-civic-blue)",
-            textTransform: "uppercase",
             letterSpacing: "0.08em",
+            textTransform: "uppercase",
             fontWeight: 600,
+            marginBottom: "4px",
           }}>
-            Civic Intake Portal
+            CIVIC INTAKE PORTAL &bull; INDORE MUNICIPAL WARD 34
           </div>
-          <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700, letterSpacing: "-0.01em" }}>
+          <h1 style={{ fontSize: "28px", fontWeight: 700, letterSpacing: "-0.02em", color: "var(--color-text-primary)" }}>
             Report an Infrastructure Defect
           </h1>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: "var(--font-size-sm)", marginTop: "4px" }}>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: "14px", marginTop: "2px" }}>
             Submit an individual public observation. CivicTrace will automatically compute duplicate similarity against existing cases and initiate cryptographic evidence tracking.
           </p>
         </div>
 
         {successResult ? (
-          <div className="card" style={{ borderLeft: "4px solid var(--color-verified-green)" }}>
+          <div style={{
+            maxWidth: "780px",
+            backgroundColor: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderLeft: "4px solid var(--color-verified-green)",
+            borderRadius: "var(--radius-sm)",
+            padding: "24px",
+          }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-              <CheckCircle color="var(--color-verified-green)" size={24} />
-              <h2 style={{ fontSize: "18px", fontWeight: 700 }}>Observation Successfully Registered</h2>
+              <CheckCircle size={24} color="var(--color-verified-green)" />
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-verified-green)" }}>
+                Observation Successfully Registered
+              </h2>
             </div>
-            <p style={{ fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-              Your report has been assigned public identifier <strong className="mono-id">{successResult.public_id}</strong>.
+
+            <p style={{ fontSize: "14px", color: "var(--color-text-secondary)", marginBottom: "16px", lineHeight: 1.5 }}>
+              Your field observation has been recorded and submitted to the deterministic correlation engine.
             </p>
-            <div style={{ marginTop: "16px", display: "flex", gap: "10px" }}>
-              <button onClick={() => navigate("/explorer")} className="btn btn-primary">
-                View in Public Cases Explorer
+
+            <div style={{
+              backgroundColor: "var(--color-surface-elevated)",
+              border: "1px solid var(--color-border-subtle)",
+              padding: "14px 18px",
+              borderRadius: "var(--radius-sm)",
+              fontSize: "13px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+              marginBottom: "20px",
+            }}>
+              <div><strong>Report Reference:</strong> <span className="mono-id">{successResult.public_id}</span></div>
+              <div><strong>Infrastructure Hazard:</strong> {successResult.title}</div>
+              <div><strong>Location Coordinates:</strong> {successResult.latitude.toFixed(5)}, {successResult.longitude.toFixed(5)}</div>
+            </div>
+
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button
+                onClick={() => navigate("/explorer")}
+                className="btn btn-primary"
+              >
+                View in Public Cases Explorer <ArrowRight size={14} />
               </button>
               <button
                 onClick={() => {
                   setSuccessResult(null);
                   setTitle("");
                   setDescription("");
+                  setAddressRef("");
                 }}
                 className="btn btn-outline"
               >
@@ -121,213 +159,273 @@ export const ReportIssueView: React.FC = () => {
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="card" style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-            {errorMsg && (
-              <div style={{
-                backgroundColor: "var(--color-disputed-red-subtle)",
-                color: "var(--color-disputed-red)",
-                padding: "10px 14px",
-                borderRadius: "var(--radius-sm)",
-                fontSize: "13px",
-              }}>
-                {errorMsg}
-              </div>
-            )}
-
-            <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                Infrastructure Category
-              </label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                required
-                style={{
-                  width: "100%",
-                  padding: "9px 12px",
-                  fontSize: "14px",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--radius-sm)",
-                  backgroundColor: "var(--color-surface)",
-                }}
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                Brief Title
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Deep pothole on MG Road near Rajwada intersection"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-                minLength={5}
-                style={{
-                  width: "100%",
-                  padding: "9px 12px",
-                  fontSize: "14px",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--radius-sm)",
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                Observed Problem Details
-              </label>
-              <textarea
-                rows={4}
-                placeholder="Detail what you observed, physical depth, hazards to pedestrians, water leaks, or safety risks..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                required
-                minLength={10}
-                style={{
-                  width: "100%",
-                  padding: "9px 12px",
-                  fontSize: "14px",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--radius-sm)",
-                  lineHeight: 1.5,
-                }}
-              />
-            </div>
-
-            {/* Geographic Coordinates & Location */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1.6fr) minmax(320px, 1fr)",
+            gap: "28px",
+            alignItems: "start",
+          }}>
+            {/* Primary Intake Form Card */}
             <div style={{
-              backgroundColor: "var(--color-surface-elevated)",
-              padding: "16px",
-              border: "1px solid var(--color-border-subtle)",
+              backgroundColor: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
               borderRadius: "var(--radius-sm)",
+              padding: "24px",
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                <span style={{ fontWeight: 600, fontSize: "13px" }}>Geographic Location (Indore Area)</span>
-                <button
-                  type="button"
-                  onClick={handleUseBrowserLocation}
-                  className="btn btn-outline btn-sm"
-                >
-                  <MapPin size={12} /> Use GPS
-                </button>
-              </div>
+              {errorMsg && (
+                <div style={{
+                  padding: "12px 14px",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: "13px",
+                  marginBottom: "16px",
+                  backgroundColor: "var(--color-disputed-red-subtle)",
+                  color: "var(--color-disputed-red)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}>
+                  <ShieldAlert size={16} /> {errorMsg}
+                </div>
+              )}
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+              <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
                 <div>
-                  <label style={{ fontSize: "11px", color: "var(--color-text-secondary)" }}>Latitude</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={latitude}
-                    onChange={(e) => setLatitude(parseFloat(e.target.value))}
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                    Infrastructure Hazard Category
+                  </label>
+                  <select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
                     required
                     style={{
                       width: "100%",
-                      padding: "6px 8px",
-                      fontSize: "13px",
+                      padding: "8px 12px",
+                      fontSize: "14px",
                       border: "1px solid var(--color-border)",
                       borderRadius: "var(--radius-sm)",
-                      fontFamily: "var(--font-family-mono)",
+                      backgroundColor: "var(--color-surface)",
                     }}
-                  />
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
                 </div>
+
                 <div>
-                  <label style={{ fontSize: "11px", color: "var(--color-text-secondary)" }}>Longitude</label>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                    Brief Summary / Title
+                  </label>
                   <input
-                    type="number"
-                    step="any"
-                    value={longitude}
-                    onChange={(e) => setLongitude(parseFloat(e.target.value))}
+                    type="text"
+                    placeholder="e.g. Deep pothole on MG Road near Rajwada intersection"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
                     required
                     style={{
                       width: "100%",
-                      padding: "6px 8px",
-                      fontSize: "13px",
+                      padding: "8px 12px",
+                      fontSize: "14px",
                       border: "1px solid var(--color-border)",
                       borderRadius: "var(--radius-sm)",
-                      fontFamily: "var(--font-family-mono)",
                     }}
                   />
                 </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                    Observed Problem Details & Physical Severity
+                  </label>
+                  <textarea
+                    rows={4}
+                    placeholder="Detail what you observed, physical depth, hazards to pedestrians, water leaks, or safety risks..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      fontSize: "14px",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: "var(--radius-sm)",
+                      lineHeight: 1.5,
+                    }}
+                  />
+                </div>
+
+                {/* Location Picker Box */}
+                <div style={{
+                  backgroundColor: "var(--color-surface-elevated)",
+                  border: "1px solid var(--color-border)",
+                  padding: "16px",
+                  borderRadius: "var(--radius-sm)",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 600 }}>Geographic Location (Indore Grid)</span>
+                    <button
+                      type="button"
+                      onClick={handleUseBrowserLocation}
+                      className="btn btn-outline btn-sm"
+                    >
+                      <MapPin size={13} /> Use Device GPS
+                    </button>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", marginBottom: "4px" }}>Latitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={latitude}
+                        onChange={(e) => setLatitude(parseFloat(e.target.value))}
+                        required
+                        style={{
+                          width: "100%",
+                          padding: "6px 10px",
+                          fontSize: "13px",
+                          fontFamily: "var(--font-family-mono)",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: "var(--radius-sm)",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", marginBottom: "4px" }}>Longitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={longitude}
+                        onChange={(e) => setLongitude(parseFloat(e.target.value))}
+                        required
+                        style={{
+                          width: "100%",
+                          padding: "6px 10px",
+                          fontSize: "13px",
+                          fontFamily: "var(--font-family-mono)",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: "var(--radius-sm)",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", marginBottom: "4px" }}>Street / Landmark Reference</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Near Rajwada Palace, MG Road crossing"
+                      value={addressRef}
+                      onChange={(e) => setAddressRef(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "6px 10px",
+                        fontSize: "13px",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: "var(--radius-sm)",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Evidence Photo Upload */}
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "4px" }}>
+                    Attach Photo Evidence (Optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, image/webp"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setEvidenceFile(e.target.files[0]);
+                      }
+                    }}
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--color-text-secondary)",
+                    }}
+                  />
+                  <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>
+                    Files are validated for MIME type, byte integrity, and hashed into the public evidence archive.
+                  </div>
+                </div>
+
+                {/* Submitter Pseudonym */}
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "4px" }}>
+                    Observer Pseudonym / Attribution (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ward 34 Resident, Commuter"
+                    value={pseudonym}
+                    onChange={(e) => setPseudonym(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      fontSize: "14px",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: "var(--radius-sm)",
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn btn-primary"
+                  style={{ alignSelf: "flex-start", marginTop: "6px" }}
+                >
+                  <Send size={14} /> {loading ? "Registering Observation..." : "Submit Observation to Ledger"}
+                </button>
+              </form>
+            </div>
+
+            {/* Explanatory Sidebar Card */}
+            <div style={{
+              backgroundColor: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              padding: "20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}>
+              <div className="grid-header" style={{ margin: "-20px -20px 0", borderRadius: "var(--radius-sm) var(--radius-sm) 0 0" }}>
+                <span>Accountability Standards</span>
               </div>
 
               <div>
-                <label style={{ fontSize: "11px", color: "var(--color-text-secondary)" }}>Street / Landmark Reference</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Near Rajwada Palace / Cloth Market Crossing"
-                  value={addressRef}
-                  onChange={(e) => setAddressRef(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "7px 10px",
-                    fontSize: "13px",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: "var(--radius-sm)",
-                  }}
-                />
+                <h3 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "6px" }}>
+                  1. Automatic Duplicate Correlation
+                </h3>
+                <p style={{ fontSize: "12px", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+                  If other citizens have reported the same issue nearby, CivicTrace calculates Haversine proximity and text token similarity to consolidate evidence rather than creating disconnected tickets.
+                </p>
+              </div>
+
+              <div>
+                <h3 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "6px" }}>
+                  2. Transparent Civic Priority
+                </h3>
+                <p style={{ fontSize: "12px", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+                  Reports automatically receive an explainable priority score based on intrinsic hazard severity and corroboration count.
+                </p>
+              </div>
+
+              <div>
+                <h3 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "6px" }}>
+                  3. Append-Only Provenance
+                </h3>
+                <p style={{ fontSize: "12px", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+                  Every observation creates an immutable audit event on a sequential SHA-256 ledger. No administrator can delete a report without invalidating the chain.
+                </p>
               </div>
             </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                Attach Photo or Document Evidence (Optional)
-              </label>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,application/pdf"
-                onChange={(e) => setEvidenceFile(e.target.files ? e.target.files[0] : null)}
-                style={{
-                  width: "100%",
-                  padding: "8px 10px",
-                  fontSize: "13px",
-                  border: "1px dashed var(--color-border-strong)",
-                  borderRadius: "var(--radius-sm)",
-                  backgroundColor: "var(--color-surface-elevated)",
-                }}
-              />
-              <span style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px", display: "block" }}>
-                Supported formats: JPG, PNG, WEBP, PDF (Max 10MB). SHA-256 digest is generated automatically upon receipt.
-              </span>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                Citizen Pseudonym (Privacy Preserving)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Aarav Mehta (or leave blank for guest)"
-                value={pseudonym}
-                onChange={(e) => setPseudonym(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  fontSize: "13px",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--radius-sm)",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "8px" }}>
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn btn-primary"
-                style={{ padding: "10px 24px", fontSize: "14px" }}
-              >
-                <Send size={14} /> {loading ? "Recording Observation..." : "Submit to Public Record"}
-              </button>
-            </div>
-          </form>
+          </div>
         )}
+
       </div>
     </div>
   );

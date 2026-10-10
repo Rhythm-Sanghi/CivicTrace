@@ -1,9 +1,13 @@
 /* CivicTrace: Workshop + Gridline + Studio Utility Design Tokens */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
 :root {
+  /* Disciplined Material Palette */
   --color-canvas: #F5F4F0;
   --color-surface: #FFFFFF;
   --color-surface-elevated: #FAFAF8;
-  --color-surface-subtle: #EFEFE9;
+  --color-surface-subtle: #ECECE6;
+  --color-surface-muted: #E2E2DA;
 
   --color-text-primary: #202722;
   --color-text-secondary: #68716B;
@@ -14,7 +18,7 @@
   --color-border-subtle: #E8ECE7;
   --color-border-strong: #A6AFA4;
 
-  /* Restrained civic accents */
+  /* Functional Civic Accents */
   --color-civic-blue: #285E79;
   --color-civic-blue-hover: #1E495E;
   --color-civic-blue-subtle: #EDF4F7;
@@ -28,27 +32,24 @@
   --color-disputed-red: #A64F49;
   --color-disputed-red-subtle: #FDF1F0;
 
-  /* Typography */
-  --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  /* Typography Scale */
+  --font-family-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
 
-  --font-size-xs: 0.75rem;     /* 12px */
-  --font-size-sm: 0.84375rem;  /* 13.5px */
-  --font-size-base: 0.9375rem; /* 15px */
-  --font-size-md: 1.0625rem;   /* 17px */
-  --font-size-lg: 1.25rem;     /* 20px */
-  --font-size-xl: 1.5rem;      /* 24px */
-  --font-size-2xl: 1.875rem;   /* 30px */
+  --font-size-2xs: 0.6875rem; /* 11px */
+  --font-size-xs: 0.75rem;    /* 12px */
+  --font-size-sm: 0.84375rem; /* 13.5px */
+  --font-size-base: 0.9375rem;/* 15px */
+  --font-size-md: 1.0625rem;  /* 17px */
+  --font-size-lg: 1.25rem;    /* 20px */
+  --font-size-xl: 1.5rem;     /* 24px */
+  --font-size-2xl: 1.875rem;  /* 30px */
+  --font-size-3xl: 2.25rem;   /* 36px */
 
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
-
-  /* Line Heights */
-  --line-height-tight: 1.25;
-  --line-height-base: 1.5;
-  --line-height-relaxed: 1.625;
 
   /* Spacing Rhythm (4px baseline scale) */
   --space-1: 0.25rem;  /* 4px */
@@ -61,20 +62,19 @@
   --space-10: 2.5rem;  /* 40px */
   --space-12: 3rem;    /* 48px */
 
-  /* Borders & Radius (Workshop utility: sharp or subtle 3px/4px radius) */
+  /* Structural Geometry */
   --radius-none: 0px;
-  --radius-sm: 3px;
-  --radius-md: 4px;
-  --radius-lg: 6px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
 
-  /* Document Shadows (Restrained studio feel) */
-  --shadow-subtle: 0 1px 2px rgba(32, 39, 34, 0.05);
-  --shadow-card: 0 1px 3px rgba(32, 39, 34, 0.08), 0 1px 2px rgba(32, 39, 34, 0.04);
-  --shadow-elevated: 0 4px 12px rgba(32, 39, 34, 0.1);
+  /* Shadows (Subtle architectural lines rather than heavy blur) */
+  --shadow-subtle: 0 1px 2px rgba(32, 39, 34, 0.04);
+  --shadow-card: 0 1px 3px rgba(32, 39, 34, 0.06);
 
   /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
+  --transition-fast: 120ms ease;
+  --transition-normal: 200ms ease;
 }
 
 *, *::before, *::after {
@@ -83,27 +83,40 @@
   padding: 0;
 }
 
-body {
+html, body {
+  width: 100%;
+  min-height: 100%;
   background-color: var(--color-canvas);
   color: var(--color-text-primary);
   font-family: var(--font-family-sans);
   font-size: var(--font-size-base);
-  line-height: var(--line-height-base);
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
 }
 
-/* Document & Gridline Utility Classes */
-.container {
-  max-width: 1280px;
+/* Fluid Full-Width Workspace Container: 24-40px responsive horizontal gutters */
+.workspace-container {
+  width: 100%;
+  max-width: 1920px;
   margin: 0 auto;
-  padding: 0 var(--space-6);
+  padding-left: clamp(16px, 2.5vw, 40px);
+  padding-right: clamp(16px, 2.5vw, 40px);
 }
 
+/* Backward compatibility fallback */
+.container {
+  width: 100%;
+  max-width: 1920px;
+  margin: 0 auto;
+  padding-left: clamp(16px, 2.5vw, 40px);
+  padding-right: clamp(16px, 2.5vw, 40px);
+}
+
+/* Workshop Utility Typography & Stamps */
 .mono-id {
   font-family: var(--font-family-mono);
   font-size: var(--font-size-xs);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   font-weight: var(--font-weight-medium);
   background-color: var(--color-surface-subtle);
   border: 1px solid var(--color-border);
@@ -115,11 +128,11 @@ body {
 
 .archival-stamp {
   font-family: var(--font-family-mono);
-  font-size: 0.7rem;
+  font-size: 0.6875rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   font-weight: var(--font-weight-semibold);
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
@@ -138,7 +151,7 @@ body {
   border: 1px solid var(--color-disputed-red);
 }
 
-.stamp-claimed {
+.stamp-claimed, .stamp-awaiting_verification {
   background-color: var(--color-attention-orange-subtle);
   color: var(--color-attention-orange);
   border: 1px solid var(--color-attention-orange);
@@ -150,6 +163,12 @@ body {
   border: 1px solid var(--color-civic-blue);
 }
 
+.stamp-assigned, .stamp-in_progress {
+  background-color: #EBF3F8;
+  color: #1E4F6C;
+  border: 1px solid #9BC0D6;
+}
+
 /* Workshop Buttons */
 .btn {
   display: inline-flex;
@@ -159,12 +178,13 @@ body {
   font-family: var(--font-family-sans);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  padding: 7px 14px;
+  padding: 8px 16px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   border: 1px solid transparent;
   transition: all var(--transition-fast);
   text-decoration: none;
+  line-height: 1.2;
 }
 
 .btn-primary {
@@ -175,6 +195,7 @@ body {
 
 .btn-primary:hover {
   background-color: var(--color-civic-blue-hover);
+  border-color: var(--color-civic-blue-hover);
 }
 
 .btn-outline {
@@ -189,10 +210,11 @@ body {
 }
 
 .btn-sm {
-  padding: 4px 10px;
+  padding: 5px 10px;
   font-size: var(--font-size-xs);
 }
 
+/* Gridline Surface Panels */
 .card {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -201,6 +223,7 @@ body {
   box-shadow: var(--shadow-subtle);
 }
 
+/* Ruled Ledger Table */
 .ruled-table {
   width: 100%;
   border-collapse: collapse;
@@ -211,6 +234,9 @@ body {
   text-align: left;
   padding: var(--space-3) var(--space-4);
   font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   color: var(--color-text-secondary);
   border-bottom: 2px solid var(--color-border);
   background-color: var(--color-surface-elevated);
@@ -219,9 +245,34 @@ body {
 .ruled-table td {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .ruled-table tr:hover td {
+  background-color: #FAFAF7;
+}
+
+/* Grid Layout Helpers */
+.grid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
   background-color: var(--color-surface-elevated);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+/* Responsive Breakpoints & Shell Utilities */
+@media (max-width: 860px) {
+  .desktop-nav {
+    display: none !important;
+  }
+  .mobile-menu-toggle {
+    display: inline-flex !important;
+  }
 }

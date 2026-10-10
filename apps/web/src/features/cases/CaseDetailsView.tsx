@@ -76,24 +76,37 @@ export const CaseDetailsView: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="container" style={{ padding: "40px 0" }}>Loading case evidence ledger...</div>;
+    return <div className="workspace-container" style={{ padding: "40px 0" }}>Loading case evidence ledger...</div>;
   }
 
   if (!caseItem) {
-    return <div className="container" style={{ padding: "40px 0" }}>Case not found.</div>;
+    return <div className="workspace-container" style={{ padding: "40px 0" }}>Case not found.</div>;
   }
 
   return (
-    <div style={{ padding: "var(--space-6) 0" }}>
-      <div className="container">
-        {/* Breadcrumb / Document Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+    <div style={{ padding: "var(--space-6) 0 var(--space-12)" }}>
+      <div className="workspace-container">
+        
+        {/* Document Breadcrumb & Action Bar */}
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "12px",
+          paddingBottom: "var(--space-3)",
+          borderBottom: "1px solid var(--color-border)",
+          marginBottom: "var(--space-5)",
+        }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <Link to="/explorer" style={{ color: "var(--color-text-secondary)", textDecoration: "none", fontSize: "13px" }}>
               &larr; Back to Cases
             </Link>
             <span style={{ color: "var(--color-border-strong)" }}>/</span>
             <span className="mono-id">{caseItem.public_id}</span>
+            <span className={`archival-stamp stamp-${caseItem.state.toLowerCase()}`}>
+              {caseItem.state.replace("_", " ")}
+            </span>
           </div>
 
           <a
@@ -105,19 +118,20 @@ export const CaseDetailsView: React.FC = () => {
           </a>
         </div>
 
-        {/* Case Dossier Main Card */}
-        <div className="card" style={{ marginBottom: "24px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
-            <div style={{ maxWidth: "800px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <span className={`archival-stamp stamp-${caseItem.state.toLowerCase()}`}>
-                  {caseItem.state.replace("_", " ")}
-                </span>
-                <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
-                  Category: <strong>{caseItem.category?.name}</strong>
-                </span>
+        {/* Master Case Header Banner */}
+        <div style={{
+          backgroundColor: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-sm)",
+          padding: "24px",
+          marginBottom: "var(--space-6)",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "20px" }}>
+            <div style={{ flex: "1 1 650px" }}>
+              <div style={{ fontSize: "12px", color: "var(--color-civic-blue)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "4px" }}>
+                {caseItem.category?.name} &bull; INDORE MUNICIPAL WARD 34
               </div>
-              <h1 style={{ fontSize: "22px", fontWeight: 700, color: "var(--color-text-primary)" }}>
+              <h1 style={{ fontSize: "clamp(22px, 2vw, 30px)", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.25 }}>
                 {caseItem.title}
               </h1>
               <p style={{ marginTop: "10px", fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
@@ -128,27 +142,28 @@ export const CaseDetailsView: React.FC = () => {
             <div style={{
               backgroundColor: "var(--color-surface-elevated)",
               border: "1px solid var(--color-border)",
-              padding: "12px 16px",
+              padding: "16px 20px",
               borderRadius: "var(--radius-sm)",
+              minWidth: "220px",
               textAlign: "right",
             }}>
               <div style={{ fontSize: "11px", textTransform: "uppercase", fontWeight: 600, color: "var(--color-text-secondary)" }}>
-                Civic Priority Score
+                CIVIC PRIORITY SCORE
               </div>
-              <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--color-civic-blue)", fontFamily: "var(--font-family-mono)" }}>
-                {caseItem.priority_score.toFixed(1)} <span style={{ fontSize: "14px" }}>/ 10</span>
+              <div style={{ fontSize: "28px", fontWeight: 700, color: "var(--color-civic-blue)", fontFamily: "var(--font-family-mono)", marginTop: "2px" }}>
+                {caseItem.priority_score.toFixed(1)} <span style={{ fontSize: "15px", color: "var(--color-text-muted)" }}>/ 10</span>
               </div>
-              <span className="mono-id" style={{ marginTop: "4px" }}>
-                BAND: {caseItem.priority_band}
-              </span>
+              <div style={{ marginTop: "4px" }}>
+                <span className="mono-id">BAND: {caseItem.priority_band}</span>
+              </div>
             </div>
           </div>
 
-          {/* Reviewer / Operator Role Transition Controls */}
+          {/* Contextual Role Operations Dock */}
           {user && (user.role === "REVIEWER" || user.role === "ADMINISTRATOR" || user.role === "OPERATOR") && (
             <div style={{
-              marginTop: "16px",
-              padding: "12px",
+              marginTop: "18px",
+              padding: "12px 16px",
               backgroundColor: "var(--color-surface-elevated)",
               border: "1px solid var(--color-border)",
               borderRadius: "var(--radius-sm)",
@@ -156,10 +171,10 @@ export const CaseDetailsView: React.FC = () => {
               alignItems: "center",
               justifyContent: "space-between",
               flexWrap: "wrap",
-              gap: "10px",
+              gap: "12px",
             }}>
               <div style={{ fontSize: "13px" }}>
-                <strong>Role Action Panel ({user.role}):</strong> Current case state is <span className="mono-id">{caseItem.state}</span>
+                <strong>Role Action Dock ({user.role}):</strong> Current case state is <span className="mono-id">{caseItem.state}</span>
               </div>
 
               <div style={{ display: "flex", gap: "8px" }}>
@@ -249,49 +264,16 @@ export const CaseDetailsView: React.FC = () => {
               </div>
             </div>
           )}
-
-          {/* Metadata Grid */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "16px",
-            marginTop: "20px",
-            paddingTop: "16px",
-            borderTop: "1px solid var(--color-border-subtle)",
-            fontSize: "13px",
-          }}>
-            <div>
-              <span style={{ color: "var(--color-text-muted)" }}>Location:</span>
-              <div style={{ fontWeight: 500 }}>{caseItem.address_reference || "Indore Central Ward"}</div>
-              <div style={{ fontFamily: "var(--font-family-mono)", fontSize: "11px", color: "var(--color-text-secondary)" }}>
-                {caseItem.latitude.toFixed(5)}, {caseItem.longitude.toFixed(5)}
-              </div>
-            </div>
-            <div>
-              <span style={{ color: "var(--color-text-muted)" }}>Corroborated Reports:</span>
-              <div style={{ fontWeight: 500 }}>{caseItem.report_count} independent submissions</div>
-            </div>
-            <div>
-              <span style={{ color: "var(--color-text-muted)" }}>Submitted On:</span>
-              <div style={{ fontWeight: 500 }}>{new Date(caseItem.created_at).toLocaleDateString()}</div>
-            </div>
-            <div>
-              <span style={{ color: "var(--color-text-muted)" }}>Verification Status:</span>
-              <div style={{ fontWeight: 600, color: caseItem.state === "RESOLVED" ? "var(--color-verified-green)" : caseItem.state === "DISPUTED" ? "var(--color-disputed-red)" : "var(--color-attention-orange)" }}>
-                {caseItem.state === "RESOLVED" ? "Independently Verified Fixed" : caseItem.state === "DISPUTED" ? "Claim Disputed by Public" : "Pending Community Verification"}
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* Cryptographic Ledger Health Box */}
+        {/* Cryptographic Ledger Health Strip */}
         {ledgerValidation && (
           <div style={{
             backgroundColor: ledgerValidation.is_valid ? "var(--color-verified-green-subtle)" : "var(--color-disputed-red-subtle)",
             border: `1px solid ${ledgerValidation.is_valid ? "var(--color-verified-green)" : "var(--color-disputed-red)"}`,
-            padding: "14px 18px",
+            padding: "14px 20px",
             borderRadius: "var(--radius-sm)",
-            marginBottom: "24px",
+            marginBottom: "var(--space-6)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -324,15 +306,99 @@ export const CaseDetailsView: React.FC = () => {
           </div>
         )}
 
-        {/* Two-Column Grid: Timeline Ledger (Left) and Citizen Verification Station (Right) */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "24px" }}>
-          {/* Append-only Event Timeline */}
-          <div>
-            <h2 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <History size={18} /> Append-Only Accountability Timeline
-            </h2>
+        {/* Studio Utility 3-Column Dossier Workspace on Desktop:
+            Col 1 (25%): Evidence Provenance & Location
+            Col 2 (45%): Append-Only Chronological Timeline
+            Col 3 (30%): Independent Verification & Claim Station
+        */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(280px, 1fr) minmax(380px, 1.8fr) minmax(320px, 1.2fr)",
+          gap: "24px",
+          alignItems: "start",
+        }}>
+          {/* COLUMN 1: EVIDENCE PROVENANCE & LOCAL CONTEXT */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div style={{
+              backgroundColor: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              padding: "18px",
+            }}>
+              <div className="grid-header" style={{ margin: "-18px -18px 14px", borderRadius: "var(--radius-sm) var(--radius-sm) 0 0" }}>
+                <span>Geographic Provenance</span>
+              </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "13px" }}>
+                <div>
+                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px", textTransform: "uppercase", fontWeight: 600 }}>Location</span>
+                  <div style={{ fontWeight: 600, marginTop: "2px" }}>{caseItem.address_reference || "Indore Central Ward"}</div>
+                </div>
+
+                <div>
+                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px", textTransform: "uppercase", fontWeight: 600 }}>Coordinates (WGS84)</span>
+                  <div style={{ fontFamily: "var(--font-family-mono)", fontSize: "12px", marginTop: "2px" }}>
+                    LAT: {caseItem.latitude.toFixed(5)}<br />LON: {caseItem.longitude.toFixed(5)}
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px", textTransform: "uppercase", fontWeight: 600 }}>Corroborated Reports</span>
+                  <div style={{ fontWeight: 600, marginTop: "2px" }}>{caseItem.report_count} independent submission(s)</div>
+                </div>
+
+                <div>
+                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px", textTransform: "uppercase", fontWeight: 600 }}>Submitted On</span>
+                  <div style={{ marginTop: "2px" }}>{new Date(caseItem.created_at).toLocaleDateString()}</div>
+                </div>
+
+                <div>
+                  <span style={{ color: "var(--color-text-muted)", fontSize: "11px", textTransform: "uppercase", fontWeight: 600 }}>Resolution Integrity</span>
+                  <div style={{ fontWeight: 600, marginTop: "2px", color: caseItem.state === "RESOLVED" ? "var(--color-verified-green)" : caseItem.state === "DISPUTED" ? "var(--color-disputed-red)" : "var(--color-attention-orange)" }}>
+                    {caseItem.state === "RESOLVED" ? "Independently Verified Fixed" : caseItem.state === "DISPUTED" ? "Claim Disputed by Public" : "Pending Community Verification"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              backgroundColor: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              padding: "16px",
+            }}>
+              <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: "6px" }}>
+                Verification Protocol
+              </div>
+              <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+                CivicTrace requires 2 independent citizen confirmations or administrative audit to auto-resolve. Any dispute observation immediately halts resolution and escalates to DISPUTED.
+              </div>
+            </div>
+          </div>
+
+          {/* COLUMN 2: APPEND-ONLY CHRONOLOGICAL ACTIVITY TIMELINE */}
+          <div>
+            <div className="grid-header" style={{
+              backgroundColor: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              borderBottom: "none",
+              borderRadius: "var(--radius-sm) var(--radius-sm) 0 0",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <History size={14} />
+                <span>Append-Only Accountability Timeline ({events.length} Events)</span>
+              </div>
+            </div>
+
+            <div style={{
+              backgroundColor: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "0 0 var(--radius-sm) var(--radius-sm)",
+              padding: "16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}>
               {events.map((evt) => {
                 const payload = JSON.parse(evt.payload_json || "{}");
                 const borderAccent =
@@ -349,21 +415,22 @@ export const CaseDetailsView: React.FC = () => {
                 return (
                   <div
                     key={evt.id}
-                    className="card"
                     style={{
+                      border: "1px solid var(--color-border)",
                       borderLeft: `4px solid ${borderAccent}`,
+                      borderRadius: "var(--radius-sm)",
                       padding: "14px",
-                      position: "relative",
+                      backgroundColor: "var(--color-surface-elevated)",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                       <span className="mono-id">EVENT #{evt.event_index}</span>
                       <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
                         {new Date(evt.created_at).toLocaleString()}
                       </span>
                     </div>
 
-                    <div style={{ fontWeight: 600, fontSize: "14px", color: "var(--color-text-primary)" }}>
+                    <div style={{ fontWeight: 600, fontSize: "14px", color: "var(--color-text-primary)", marginTop: "2px" }}>
                       {evt.event_type.replace(/_/g, " ")}
                     </div>
                     <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "8px" }}>
@@ -372,7 +439,8 @@ export const CaseDetailsView: React.FC = () => {
 
                     {/* Formatted Event Details */}
                     <div style={{
-                      backgroundColor: "var(--color-surface-elevated)",
+                      backgroundColor: "#FFF",
+                      border: "1px solid var(--color-border-subtle)",
                       padding: "8px 10px",
                       borderRadius: "var(--radius-sm)",
                       fontSize: "12px",
@@ -387,7 +455,7 @@ export const CaseDetailsView: React.FC = () => {
                       ))}
                     </div>
 
-                    {/* Hash link stamp */}
+                    {/* Hash Link Stamp */}
                     <div style={{
                       marginTop: "8px",
                       fontSize: "10px",
@@ -405,105 +473,112 @@ export const CaseDetailsView: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column: Independent Resolution Verification Station */}
-          <div>
-            <h2 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <FileCheck size={18} /> Independent Citizen Verification
-            </h2>
+          {/* COLUMN 3: INDEPENDENT CITIZEN VERIFICATION STATION */}
+          <div style={{
+            backgroundColor: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-sm)",
+            padding: "20px",
+          }}>
+            <div className="grid-header" style={{ margin: "-20px -20px 16px", borderRadius: "var(--radius-sm) var(--radius-sm) 0 0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <FileCheck size={14} color="var(--color-verified-green)" />
+                <span>Independent Citizen Verification</span>
+              </div>
+            </div>
 
-            <div className="card" style={{ marginBottom: "20px" }}>
-              <div style={{ fontSize: "13px", color: "var(--color-text-secondary)", marginBottom: "14px", lineHeight: 1.5 }}>
-                Have you inspected this location? In CivicTrace, public works claims do not automatically close a case. Citizen verification confirms whether the defect is genuinely repaired or still persists.
+            <div style={{ fontSize: "13px", color: "var(--color-text-secondary)", marginBottom: "14px", lineHeight: 1.5 }}>
+              Have you inspected this location? In CivicTrace, public works claims do not automatically close a case. Citizen verification confirms whether the defect is genuinely repaired or still persists.
+            </div>
+
+            {feedbackMsg && (
+              <div style={{
+                padding: "10px",
+                borderRadius: "var(--radius-sm)",
+                fontSize: "12px",
+                marginBottom: "12px",
+                backgroundColor: feedbackMsg.includes("Error") ? "var(--color-disputed-red-subtle)" : "var(--color-verified-green-subtle)",
+                color: feedbackMsg.includes("Error") ? "var(--color-disputed-red)" : "var(--color-verified-green)",
+              }}>
+                {feedbackMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleVerificationSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
+                  Observation Outcome
+                </label>
+                <select
+                  value={verificationOutcome}
+                  onChange={(e) => setVerificationOutcome(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    fontSize: "13px",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                    backgroundColor: "var(--color-surface)",
+                  }}
+                >
+                  <option value="CONFIRMED_FIXED">Confirmed Fixed (Repaired satisfactorily)</option>
+                  <option value="STILL_UNRESOLVED">Still Unresolved (Defect persists)</option>
+                  <option value="PARTIALLY_FIXED">Partially Fixed (Substandard repair)</option>
+                  <option value="UNABLE_TO_VERIFY">Unable to Verify (Inaccessible)</option>
+                </select>
               </div>
 
-              {feedbackMsg && (
-                <div style={{
-                  padding: "10px",
-                  borderRadius: "var(--radius-sm)",
-                  fontSize: "12px",
-                  marginBottom: "12px",
-                  backgroundColor: feedbackMsg.includes("Error") ? "var(--color-disputed-red-subtle)" : "var(--color-verified-green-subtle)",
-                  color: feedbackMsg.includes("Error") ? "var(--color-disputed-red)" : "var(--color-verified-green)",
-                }}>
-                  {feedbackMsg}
-                </div>
-              )}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
+                  Inspector Pseudonym or Reference
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Local Resident, Daily Commuter"
+                  value={verifierName}
+                  onChange={(e) => setVerifierName(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    fontSize: "13px",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                />
+              </div>
 
-              <form onSubmit={handleVerificationSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                    Observation Outcome
-                  </label>
-                  <select
-                    value={verificationOutcome}
-                    onChange={(e) => setVerificationOutcome(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "8px",
-                      fontSize: "13px",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: "var(--radius-sm)",
-                      backgroundColor: "var(--color-surface)",
-                    }}
-                  >
-                    <option value="CONFIRMED_FIXED">Confirmed Fixed (Repaired satisfactorily)</option>
-                    <option value="STILL_UNRESOLVED">Still Unresolved (Defect persists)</option>
-                    <option value="PARTIALLY_FIXED">Partially Fixed (Substandard repair)</option>
-                    <option value="UNABLE_TO_VERIFY">Unable to Verify (Inaccessible)</option>
-                  </select>
-                </div>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
+                  Evidence Notes & Inspection Details
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Describe what you observed on site..."
+                  value={verificationNotes}
+                  onChange={(e) => setVerificationNotes(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    fontSize: "13px",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                />
+              </div>
 
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                    Inspector Pseudonym or Reference
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Local Resident, Daily Commuter"
-                    value={verifierName}
-                    onChange={(e) => setVerifierName(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "8px",
-                      fontSize: "13px",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: "var(--radius-sm)",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
-                    Evidence Notes & Inspection Details
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Describe what you observed on site..."
-                    value={verificationNotes}
-                    onChange={(e) => setVerificationNotes(e.target.value)}
-                    required
-                    style={{
-                      width: "100%",
-                      padding: "8px",
-                      fontSize: "13px",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: "var(--radius-sm)",
-                    }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={verificationSubmitting}
-                  className="btn btn-primary"
-                  style={{ alignSelf: "flex-start" }}
-                >
-                  <Send size={13} /> {verificationSubmitting ? "Submitting..." : "Submit Verification Observation"}
-                </button>
-              </form>
-            </div>
+              <button
+                type="submit"
+                disabled={verificationSubmitting}
+                className="btn btn-primary"
+                style={{ width: "100%" }}
+              >
+                <Send size={13} /> {verificationSubmitting ? "Submitting..." : "Submit Verification Observation"}
+              </button>
+            </form>
           </div>
         </div>
+
       </div>
     </div>
   );

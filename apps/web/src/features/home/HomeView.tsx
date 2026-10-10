@@ -1,206 +1,516 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type Case, type NeighborhoodStats } from "../../lib/api";
-import { ArrowRight, ShieldCheck, Layers, FileSearch } from "lucide-react";
+import { api, type Case, type NeighborhoodStats, type Category } from "../../lib/api";
+import {
+  ArrowRight,
+  AlertTriangle,
+  MapPin,
+} from "lucide-react";
 
 export const HomeView: React.FC = () => {
   const [stats, setStats] = useState<NeighborhoodStats | null>(null);
-  const [criticalCases, setCriticalCases] = useState<Case[]>([]);
+  const [cases, setCases] = useState<Case[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [activeCase, setActiveCase] = useState<Case | null>(null);
 
   useEffect(() => {
     Promise.all([
       api.getNeighborhoodStats().catch(() => null),
-      api.getCases({ priority_band: "CRITICAL" }).catch(() => []),
-    ]).then(([s, c]) => {
+      api.getCases().catch(() => []),
+      api.getCategories().catch(() => []),
+    ]).then(([s, cList, cats]) => {
       setStats(s);
-      setCriticalCases(c.slice(0, 4));
+      setCases(cList);
+      setCategories(cats);
+      if (cList.length > 0) setActiveCase(cList[0]);
     });
   }, []);
 
+  const filteredCases = cases.filter((c) => {
+    if (selectedCategory && c.category_id !== selectedCategory) return false;
+    return true;
+  });
+
+  // Actionable Attention Cases (Disputed, Older Unresolved, High Priority)
+  const attentionCases = cases
+    .filter((c) => c.state === "DISPUTED" || c.state === "AWAITING_VERIFICATION" || c.priority_score >= 4.0)
+    .slice(0, 5);
+
   return (
-    <div style={{ padding: "var(--space-8) 0" }}>
-      <div className="container">
-        {/* Core Guiding Principle Banner */}
+    <div style={{ padding: "var(--space-6) 0 var(--space-10)" }}>
+      <div className="workspace-container">
+        
+        {/* EDITORIAL HEADER (Left-aligned, restrained height, workshop tone) */}
         <div style={{
-          backgroundColor: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderLeft: "4px solid var(--color-civic-blue)",
-          padding: "var(--space-6)",
-          marginBottom: "var(--space-8)",
+          borderBottom: "1px solid var(--color-border)",
+          paddingBottom: "var(--space-5)",
+          marginBottom: "var(--space-6)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          flexWrap: "wrap",
+          gap: "16px",
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
-            <div style={{ maxWidth: "780px" }}>
-              <div style={{
-                fontFamily: "var(--font-family-mono)",
-                fontSize: "var(--font-size-xs)",
-                color: "var(--color-civic-blue)",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                fontWeight: 600,
-                marginBottom: "6px",
-              }}>
-                Evidence-Oriented Civic Accountability
-              </div>
-              <h1 style={{ fontSize: "var(--font-size-2xl)", fontWeight: 700, letterSpacing: "-0.02em", color: "var(--color-text-primary)", marginBottom: "8px" }}>
-                A complaint should not disappear simply because someone changes its status to resolved.
-              </h1>
-              <p style={{ color: "var(--color-text-secondary)", fontSize: "var(--font-size-base)", lineHeight: 1.6 }}>
-                CivicTrace is not an opaque ticketing box. It maintains an append-only cryptographic ledger of civic infrastructure defects, correlates duplicate reports, and requires independent citizen verification before cases are marked resolved.
-              </p>
+          <div>
+            <div style={{
+              fontFamily: "var(--font-family-mono)",
+              fontSize: "var(--font-size-2xs)",
+              color: "var(--color-civic-blue)",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              fontWeight: 600,
+              marginBottom: "4px",
+            }}>
+              PUBLIC ACCOUNTABILITY / INDORE DEMONSTRATION
             </div>
-            <div style={{ display: "flex", gap: "12px", alignSelf: "center" }}>
-              <Link to="/report" className="btn btn-primary">
-                Report Infrastructure Defect
-              </Link>
-              <Link to="/explorer" className="btn btn-outline">
-                Explore Cases <ArrowRight size={14} />
-              </Link>
-            </div>
+            <h1 style={{
+              fontSize: "clamp(26px, 2.5vw, 36px)",
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
+              lineHeight: 1.15,
+              color: "var(--color-text-primary)",
+              marginBottom: "6px",
+            }}>
+              The state of your neighborhood.
+            </h1>
+            <p style={{
+              color: "var(--color-text-secondary)",
+              fontSize: "var(--font-size-base)",
+              maxWidth: "840px",
+              lineHeight: 1.45,
+            }}>
+              Follow infrastructure reports, see what action was taken, and check whether repairs were independently verified.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px" }}>
+            <Link to="/report" className="btn btn-primary">
+              Report an issue
+            </Link>
+            <Link to="/explorer" className="btn btn-outline">
+              Explore cases <ArrowRight size={14} />
+            </Link>
           </div>
         </div>
 
-        {/* Live Metrics Gridline Bar */}
+        {/* SECTION A: COMPACT METRICS HORIZONTAL STRIP (Ruled surface with clear columns) */}
         <div style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "16px",
-          marginBottom: "var(--space-8)",
+          backgroundColor: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-sm)",
+          marginBottom: "var(--space-6)",
+          overflow: "hidden",
         }}>
-          <div className="card">
-            <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", textTransform: "uppercase", fontWeight: 600 }}>
-              Live Open Issues
+          <div style={{ padding: "16px 20px", borderRight: "1px solid var(--color-border-subtle)" }}>
+            <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-text-secondary)" }}>
+              Open Issues
             </div>
-            <div style={{ fontSize: "28px", fontWeight: 700, color: "var(--color-text-primary)", marginTop: "4px" }}>
-              {stats ? stats.open_cases : "..."}
+            <div style={{ fontSize: "30px", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.2, marginTop: "2px" }}>
+              {stats ? stats.open_cases : "—"}
             </div>
-            <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>
-              Active investigation or repair
-            </div>
-          </div>
-
-          <div className="card">
-            <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", textTransform: "uppercase", fontWeight: 600 }}>
-              Independently Verified
-            </div>
-            <div style={{ fontSize: "28px", fontWeight: 700, color: "var(--color-verified-green)", marginTop: "4px" }}>
-              {stats ? stats.verified_resolutions : "..."}
-            </div>
-            <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>
-              Confirmed by independent citizens
+            <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "2px" }}>
+              Active investigation or work
             </div>
           </div>
 
-          <div className="card">
-            <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", textTransform: "uppercase", fontWeight: 600 }}>
+          <div style={{ padding: "16px 20px", borderRight: "1px solid var(--color-border-subtle)" }}>
+            <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-verified-green)" }}>
+              Verified Resolutions
+            </div>
+            <div style={{ fontSize: "30px", fontWeight: 700, color: "var(--color-verified-green)", lineHeight: 1.2, marginTop: "2px" }}>
+              {stats ? stats.verified_resolutions : "—"}
+            </div>
+            <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "2px" }}>
+              Confirmed fixed by citizens
+            </div>
+          </div>
+
+          <div style={{ padding: "16px 20px", borderRight: "1px solid var(--color-border-subtle)" }}>
+            <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-disputed-red)" }}>
               Disputed Claims
             </div>
-            <div style={{ fontSize: "28px", fontWeight: 700, color: "var(--color-disputed-red)", marginTop: "4px" }}>
-              {stats ? stats.disputed_resolutions : "..."}
+            <div style={{ fontSize: "30px", fontWeight: 700, color: "var(--color-disputed-red)", lineHeight: 1.2, marginTop: "2px" }}>
+              {stats ? stats.disputed_resolutions : "—"}
             </div>
-            <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>
+            <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "2px" }}>
               Work claimed but rejected by public
             </div>
           </div>
 
-          <div className="card">
-            <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", textTransform: "uppercase", fontWeight: 600 }}>
-              Median Resolution
+          <div style={{ padding: "16px 20px" }}>
+            <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-civic-blue)" }}>
+              Median Resolution Duration
             </div>
-            <div style={{ fontSize: "28px", fontWeight: 700, color: "var(--color-civic-blue)", marginTop: "4px" }}>
-              {stats ? `${stats.median_resolution_days}d` : "..."}
+            <div style={{ fontSize: "30px", fontWeight: 700, color: "var(--color-civic-blue)", lineHeight: 1.2, marginTop: "2px" }}>
+              {stats ? `${stats.median_resolution_days}d` : "—"}
             </div>
-            <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>
-              From submission to verified fix
+            <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-muted)", marginTop: "2px" }}>
+              From initial report to confirmed fix
             </div>
           </div>
         </div>
 
-        {/* Studio Utility Columns: High Priority Issues & How CivicTrace Works */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "24px" }}>
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-              <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700 }}>
-                High Priority Infrastructure Concerns
-              </h2>
-              <Link to="/explorer" style={{ fontSize: "var(--font-size-sm)", color: "var(--color-civic-blue)", textDecoration: "none" }}>
-                View all cases &rarr;
-              </Link>
+        {/* SECTION B: PRIMARY WORKSPACE (Two Columns: 68% Geographic Explorer, 32% Attention Ledger) */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1.8fr) minmax(360px, 1fr)",
+          gap: "24px",
+          marginBottom: "var(--space-8)",
+        }}>
+          {/* Left Workspace: Interactive Geographic Case Explorer */}
+          <div style={{
+            backgroundColor: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-sm)",
+            display: "flex",
+            flexDirection: "column",
+          }}>
+            <div className="grid-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <MapPin size={15} color="var(--color-civic-blue)" />
+                <span>Geographic Case Explorer &bull; Ward 34 / Central</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  style={{
+                    fontSize: "12px",
+                    padding: "3px 8px",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                    backgroundColor: "var(--color-surface)",
+                  }}
+                >
+                  <option value="">All Categories ({cases.length})</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <Link to="/explorer" style={{ textDecoration: "none", color: "var(--color-civic-blue)", fontSize: "12px", fontWeight: 600 }}>
+                  Expand Grid &rarr;
+                </Link>
+              </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {criticalCases.map((c) => (
-                <div key={c.id} className="card" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {/* Split Explorer Workspace: Geographic Canvas + Case Selector */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "1.1fr 1fr",
+              minHeight: "440px",
+            }}>
+              {/* Geographic Schematic Map */}
+              <div style={{
+                position: "relative",
+                backgroundColor: "#EBECE8",
+                borderRight: "1px solid var(--color-border)",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+              }}>
+                {/* SVG Schematic Canvas with Coordinate Grid & Actual Points */}
+                <svg
+                  style={{ width: "100%", height: "100%", flex: 1, backgroundColor: "#EBECE8" }}
+                  viewBox="0 0 500 400"
+                >
+                  <defs>
+                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#DDE0DC" strokeWidth="1" />
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#grid)" />
+
+                  {/* Ward Boundary Outline */}
+                  <polygon
+                    points="30,40 460,30 480,360 40,380"
+                    fill="rgba(40, 94, 121, 0.03)"
+                    stroke="#C3CBC1"
+                    strokeWidth="1.5"
+                    strokeDasharray="4 2"
+                  />
+
+                  {/* Arterial Roads */}
+                  <line x1="40" y1="200" x2="480" y2="190" stroke="#CAD1C9" strokeWidth="8" />
+                  <text x="50" y="185" fill="#8F9992" fontSize="10" fontFamily="IBM Plex Mono">MG ROAD CORRIDOR</text>
+
+                  <line x1="240" y1="30" x2="260" y2="380" stroke="#CAD1C9" strokeWidth="6" />
+                  <text x="268" y="55" fill="#8F9992" fontSize="10" fontFamily="IBM Plex Mono">AB ROAD</text>
+
+                  {/* Plot actual cases dynamically */}
+                  {filteredCases.map((c) => {
+                    // Normalize lat/lon to 500x400 SVG box around Indore center (22.71 to 22.73, 75.84 to 75.88)
+                    const minLat = 22.710, maxLat = 22.735;
+                    const minLon = 75.845, maxLon = 75.885;
+                    const x = Math.max(30, Math.min(460, ((c.longitude - minLon) / (maxLon - minLon)) * 430 + 35));
+                    const y = Math.max(40, Math.min(360, (1 - (c.latitude - minLat) / (maxLat - minLat)) * 320 + 40));
+                    const isSelected = activeCase?.id === c.id;
+
+                    const markerColor =
+                      c.state === "DISPUTED"
+                        ? "var(--color-disputed-red)"
+                        : c.state === "RESOLVED"
+                        ? "var(--color-verified-green)"
+                        : c.state === "AWAITING_VERIFICATION"
+                        ? "var(--color-attention-orange)"
+                        : "var(--color-civic-blue)";
+
+                    return (
+                      <g
+                        key={c.id}
+                        onClick={() => setActiveCase(c)}
+                        style={{ cursor: "pointer" }}
+                      >
+                        {isSelected && (
+                          <circle cx={x} cy={y} r="14" fill="none" stroke={markerColor} strokeWidth="2" opacity="0.5" />
+                        )}
+                        <circle cx={x} cy={y} r={isSelected ? "8" : "6"} fill={markerColor} />
+                        <text
+                          x={x + 10}
+                          y={y + 4}
+                          fill="#202722"
+                          fontSize="10"
+                          fontWeight="600"
+                          fontFamily="IBM Plex Mono"
+                        >
+                          {c.public_id.split("-").slice(1).join("-")}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+
+                {/* Map Control Bar & Coordinate Bar */}
+                <div style={{
+                  padding: "8px 14px",
+                  borderTop: "1px solid var(--color-border)",
+                  backgroundColor: "var(--color-surface)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "11px",
+                  fontFamily: "var(--font-family-mono)",
+                  color: "var(--color-text-secondary)",
+                }}>
+                  <div>INDORE WARD 34 (22.7196° N, 75.8577° E)</div>
+                  <div>OFFLINE GEOMETRIC GRID</div>
+                </div>
+              </div>
+
+              {/* Case Dossier Inspector (Active Pin Details) */}
+              <div style={{ padding: "18px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                {activeCase ? (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <span className="mono-id">{activeCase.public_id}</span>
+                      <span className={`archival-stamp stamp-${activeCase.state.toLowerCase()}`}>
+                        {activeCase.state.replace("_", " ")}
+                      </span>
+                    </div>
+
+                    <h3 style={{ fontSize: "16px", fontWeight: 700, lineHeight: 1.3, marginBottom: "8px", color: "var(--color-text-primary)" }}>
+                      {activeCase.title}
+                    </h3>
+
+                    <p style={{ fontSize: "13px", color: "var(--color-text-secondary)", lineHeight: 1.45, marginBottom: "14px" }}>
+                      {activeCase.description}
+                    </p>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", borderTop: "1px solid var(--color-border-subtle)", paddingTop: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ color: "var(--color-text-muted)" }}>Location:</span>
+                        <span style={{ fontWeight: 500 }}>{activeCase.address_reference || "Indore Central"}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ color: "var(--color-text-muted)" }}>Coordinates:</span>
+                        <span style={{ fontFamily: "var(--font-family-mono)" }}>{activeCase.latitude.toFixed(4)}, {activeCase.longitude.toFixed(4)}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ color: "var(--color-text-muted)" }}>Priority Score:</span>
+                        <span style={{ fontWeight: 700, color: "var(--color-civic-blue)", fontFamily: "var(--font-family-mono)" }}>
+                          {activeCase.priority_score.toFixed(1)} / 10 ({activeCase.priority_band})
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ color: "var(--color-text-muted)" }}>Corroborated Reports:</span>
+                        <span style={{ fontWeight: 600 }}>{activeCase.report_count} citizen report(s)</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>Select a pin on the map to inspect details.</div>
+                )}
+
+                {activeCase && (
+                  <div style={{ marginTop: "16px", borderTop: "1px solid var(--color-border)", paddingTop: "12px" }}>
+                    <Link to={`/cases/${activeCase.public_id}`} className="btn btn-primary btn-sm" style={{ width: "100%" }}>
+                      Open Complete Dossier & Audit Log &rarr;
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Workspace: Needs Attention Dossier Queue */}
+          <div style={{
+            backgroundColor: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-sm)",
+            display: "flex",
+            flexDirection: "column",
+          }}>
+            <div className="grid-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <AlertTriangle size={15} color="var(--color-attention-orange)" />
+                <span>Needs Attention &bull; Pending Verification</span>
+              </div>
+              <span className="mono-id">{attentionCases.length} Cases</span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {attentionCases.map((c) => {
+                const borderLeft =
+                  c.state === "DISPUTED"
+                    ? "var(--color-disputed-red)"
+                    : c.state === "AWAITING_VERIFICATION"
+                    ? "var(--color-attention-orange)"
+                    : "var(--color-civic-blue)";
+
+                return (
+                  <Link
+                    key={c.id}
+                    to={`/cases/${c.public_id}`}
+                    style={{
+                      display: "block",
+                      padding: "14px 18px",
+                      textDecoration: "none",
+                      color: "inherit",
+                      borderLeft: `4px solid ${borderLeft}`,
+                      borderBottom: "1px solid var(--color-border-subtle)",
+                      transition: "background-color 150ms",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-surface-elevated)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                       <span className="mono-id">{c.public_id}</span>
                       <span className={`archival-stamp stamp-${c.state.toLowerCase()}`}>
                         {c.state.replace("_", " ")}
                       </span>
                     </div>
-                    <span style={{
-                      backgroundColor: "var(--color-disputed-red-subtle)",
-                      color: "var(--color-disputed-red)",
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      padding: "2px 6px",
-                      borderRadius: "2px",
-                      fontFamily: "var(--font-family-mono)",
-                    }}>
-                      PRIORITY: {c.priority_score.toFixed(1)} / 10
-                    </span>
-                  </div>
 
-                  <Link to={`/cases/${c.public_id}`} style={{ textDecoration: "none", color: "inherit" }}>
-                    <h3 style={{ fontSize: "15px", fontWeight: 600, color: "var(--color-text-primary)", lineHeight: 1.4 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--color-text-primary)", lineHeight: 1.3, marginBottom: "4px" }}>
                       {c.title}
-                    </h3>
+                    </div>
+
+                    <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", display: "flex", justifyContent: "space-between" }}>
+                      <span>📍 {c.address_reference || "Indore Ward 34"}</span>
+                      <span style={{ fontFamily: "var(--font-family-mono)", fontWeight: 600, color: "var(--color-civic-blue)" }}>
+                        P: {c.priority_score.toFixed(1)}
+                      </span>
+                    </div>
                   </Link>
-
-                  <div style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
-                    📍 {c.address_reference || "Indore Central Ward"} &bull; {c.report_count} corroborated report(s)
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          </div>
 
-          <div>
-            <h2 style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, marginBottom: "12px" }}>
-              CivicTrace Workflow Standard
-            </h2>
-            <div className="card" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                <Layers size={20} color="var(--color-civic-blue)" style={{ marginTop: "2px", flexShrink: 0 }} />
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "14px" }}>Deterministic Duplicate Engine</div>
-                  <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px" }}>
-                    Correlates separate citizen reports via Haversine spatial proximity, token similarity, and temporal clustering into unified public cases.
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                <FileSearch size={20} color="var(--color-civic-blue)" style={{ marginTop: "2px", flexShrink: 0 }} />
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "14px" }}>Cryptographic Hash Chain</div>
-                  <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px" }}>
-                    Every transition, assignment, and observation is signed into an append-only SHA-256 ledger. Tampering is mathematically detectable.
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                <ShieldCheck size={20} color="var(--color-verified-green)" style={{ marginTop: "2px", flexShrink: 0 }} />
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "14px" }}>Independent Verification Gate</div>
-                  <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px" }}>
-                    Department repair claims remain pending until local citizens independently inspect and verify that the problem is truly fixed.
-                  </div>
-                </div>
-              </div>
+            <div style={{ padding: "12px 18px", backgroundColor: "var(--color-surface-elevated)", borderTop: "1px solid var(--color-border)", textAlign: "center", marginTop: "auto" }}>
+              <Link to="/explorer" style={{ fontSize: "12px", color: "var(--color-civic-blue)", textDecoration: "none", fontWeight: 600 }}>
+                View complete prioritized backlog &rarr;
+              </Link>
             </div>
           </div>
         </div>
+
+        {/* SECTION C: RECENT ACTIVITY LEDGER (Ruled table with actual API records) */}
+        <div style={{
+          backgroundColor: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-sm)",
+          marginBottom: "var(--space-8)",
+          overflow: "hidden",
+        }}>
+          <div className="grid-header">
+            <span>Recent Public Ledger Activity</span>
+            <Link to="/explorer" style={{ textDecoration: "none", color: "var(--color-civic-blue)", fontSize: "12px", fontWeight: 600 }}>
+              View all records &rarr;
+            </Link>
+          </div>
+
+          <table className="ruled-table">
+            <thead>
+              <tr>
+                <th style={{ width: "120px" }}>Reference</th>
+                <th>Infrastructure Issue</th>
+                <th>Neighborhood</th>
+                <th style={{ width: "160px" }}>Status</th>
+                <th style={{ width: "100px" }}>Corroborated</th>
+                <th style={{ width: "110px" }}>Date</th>
+                <th style={{ width: "80px", textAlign: "right" }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cases.slice(0, 6).map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    <span className="mono-id">{c.public_id}</span>
+                  </td>
+                  <td>
+                    <Link to={`/cases/${c.public_id}`} style={{ textDecoration: "none", color: "var(--color-text-primary)", fontWeight: 600 }}>
+                      {c.title}
+                    </Link>
+                  </td>
+                  <td style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>
+                    {c.address_reference || "Indore Central Ward"}
+                  </td>
+                  <td>
+                    <span className={`archival-stamp stamp-${c.state.toLowerCase()}`}>
+                      {c.state.replace("_", " ")}
+                    </span>
+                  </td>
+                  <td style={{ fontFamily: "var(--font-family-mono)", fontSize: "12px" }}>
+                    {c.report_count} reports
+                  </td>
+                  <td style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
+                    {new Date(c.created_at).toLocaleDateString()}
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    <Link to={`/cases/${c.public_id}`} className="btn btn-outline btn-sm" style={{ padding: "2px 8px", fontSize: "11px" }}>
+                      Inspect
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* SECTION D: ACCOUNTABILITY EXPLANATION (Disciplined editorial banner) */}
+        <div style={{
+          border: "1px solid var(--color-border)",
+          backgroundColor: "var(--color-surface-elevated)",
+          borderRadius: "var(--radius-sm)",
+          padding: "20px 24px",
+          display: "grid",
+          gridTemplateColumns: "1fr 2fr",
+          gap: "24px",
+          alignItems: "center",
+        }}>
+          <div>
+            <div style={{ fontFamily: "var(--font-family-mono)", fontSize: "11px", color: "var(--color-civic-blue)", textTransform: "uppercase", fontWeight: 600 }}>
+              The Verification Principle
+            </div>
+            <h2 style={{ fontSize: "18px", fontWeight: 700, marginTop: "4px" }}>
+              Reported. Actioned. Independently verified.
+            </h2>
+          </div>
+          <div style={{ fontSize: "13px", color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+            A complaint should not disappear simply because someone changes its status to resolved. CivicTrace enforces role separation: public works operators log work orders and claim completion, but only corroborated field inspections by local citizens or reviewers can verify resolution.
+          </div>
+        </div>
+
       </div>
     </div>
   );
