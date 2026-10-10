@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
+import { SectionHeader } from "../../components/FieldPrimitives";
 import { LogIn, Key, Shield } from "lucide-react";
 
 export const LoginView: React.FC = () => {
@@ -30,36 +31,17 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: "var(--space-8) 0 var(--space-12)" }}>
-      <div className="workspace-container" style={{ maxWidth: "540px" }}>
-        
-        <div style={{ textAlign: "center", marginBottom: "var(--space-6)" }}>
-          <div style={{
-            fontFamily: "var(--font-family-mono)",
-            fontSize: "var(--font-size-2xs)",
-            color: "var(--color-civic-blue)",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            fontWeight: 600,
-            marginBottom: "4px",
-          }}>
-            SECURITY & ACCESS GATE
-          </div>
-          <h1 style={{ fontSize: "26px", fontWeight: 700, letterSpacing: "-0.02em", color: "var(--color-text-primary)" }}>
-            CivicTrace Portal Sign-In
-          </h1>
-          <p style={{ fontSize: "14px", color: "var(--color-text-secondary)", marginTop: "4px" }}>
-            Sign in to access reviewer correlation desk or operator work orders
-          </p>
-        </div>
+    <div style={{ maxWidth: "520px", margin: "40px auto" }}>
+      <div style={{
+        backgroundColor: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-sm)",
+        overflow: "hidden",
+        marginBottom: "20px",
+      }}>
+        <SectionHeader title="CivicTrace Portal Sign-In" />
 
-        <div style={{
-          backgroundColor: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-sm)",
-          padding: "24px",
-          marginBottom: "20px",
-        }}>
+        <div style={{ padding: "24px" }}>
           {errorMsg && (
             <div style={{
               padding: "10px 14px",
@@ -75,7 +57,7 @@ export const LoginView: React.FC = () => {
 
           <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
                 Email Address
               </label>
               <input
@@ -85,8 +67,8 @@ export const LoginView: React.FC = () => {
                 required
                 style={{
                   width: "100%",
-                  padding: "8px 12px",
-                  fontSize: "14px",
+                  padding: "8px 10px",
+                  fontSize: "13px",
                   border: "1px solid var(--color-border)",
                   borderRadius: "var(--radius-sm)",
                 }}
@@ -94,7 +76,7 @@ export const LoginView: React.FC = () => {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
                 Password
               </label>
               <input
@@ -104,8 +86,8 @@ export const LoginView: React.FC = () => {
                 required
                 style={{
                   width: "100%",
-                  padding: "8px 12px",
-                  fontSize: "14px",
+                  padding: "8px 10px",
+                  fontSize: "13px",
                   border: "1px solid var(--color-border)",
                   borderRadius: "var(--radius-sm)",
                 }}
@@ -115,68 +97,76 @@ export const LoginView: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="btn btn-primary"
-              style={{ width: "100%", marginTop: "4px" }}
+              className="btn btn-dark"
+              style={{ width: "100%", marginTop: "4px", padding: "8px 14px" }}
             >
-              <LogIn size={14} /> {loading ? "Signing in..." : "Sign In"}
+              <LogIn size={14} /> {loading ? "Signing in..." : "Sign In to Field Ledger"}
             </button>
           </form>
         </div>
+      </div>
 
-        {/* Quick Demo Accounts Selection Box */}
+      {/* Quick Demo Accounts Selection Box */}
+      <div style={{
+        backgroundColor: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-sm)",
+        overflow: "hidden",
+      }}>
         <div style={{
-          backgroundColor: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-sm)",
-          padding: "18px",
+          padding: "10px 16px",
+          backgroundColor: "var(--color-surface-elevated)",
+          borderBottom: "1px solid var(--color-border)",
+          fontSize: "11px",
+          fontFamily: "var(--font-family-mono)",
+          fontWeight: 600,
+          color: "var(--color-text-secondary)",
+          textTransform: "uppercase",
         }}>
-          <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            Seeded Local Demo Roles (One-Click Selection):
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <button
-              type="button"
-              onClick={() => handleQuickDemoFill("reviewer@civictrace.local", "ReviewerPass2026!")}
-              className="btn btn-outline btn-sm"
-              style={{ justifyContent: "space-between", fontSize: "12px", padding: "8px 12px" }}
-            >
-              <span><strong>Community Reviewer:</strong> reviewer@civictrace.local</span>
-              <Key size={13} color="var(--color-civic-blue)" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemoFill("lighting.operator@civictrace.local", "OperatorPass2026!")}
-              className="btn btn-outline btn-sm"
-              style={{ justifyContent: "space-between", fontSize: "12px", padding: "8px 12px" }}
-            >
-              <span><strong>Public Works Operator:</strong> lighting.operator@civictrace.local</span>
-              <Key size={13} color="var(--color-attention-orange)" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemoFill("citizen.aarav@civictrace.local", "CitizenPass2026!")}
-              className="btn btn-outline btn-sm"
-              style={{ justifyContent: "space-between", fontSize: "12px", padding: "8px 12px" }}
-            >
-              <span><strong>Citizen Observer:</strong> citizen.aarav@civictrace.local</span>
-              <Key size={13} color="var(--color-verified-green)" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemoFill("admin@civictrace.local", "AdminPass2026!")}
-              className="btn btn-outline btn-sm"
-              style={{ justifyContent: "space-between", fontSize: "12px", padding: "8px 12px" }}
-            >
-              <span><strong>Administrator:</strong> admin@civictrace.local</span>
-              <Shield size={13} color="var(--color-civic-blue)" />
-            </button>
-          </div>
+          Seeded Local Demo Roles (One-Click Selection):
         </div>
 
+        <div style={{ padding: "14px", display: "flex", flexDirection: "column", gap: "8px" }}>
+          <button
+            type="button"
+            onClick={() => handleQuickDemoFill("reviewer@civictrace.local", "ReviewerPass2026!")}
+            className="btn btn-outline btn-sm"
+            style={{ justifyContent: "space-between", fontSize: "12px", padding: "8px 12px" }}
+          >
+            <span><strong>Community Reviewer:</strong> reviewer@civictrace.local</span>
+            <Key size={13} color="var(--color-civic-blue)" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleQuickDemoFill("lighting.operator@civictrace.local", "OperatorPass2026!")}
+            className="btn btn-outline btn-sm"
+            style={{ justifyContent: "space-between", fontSize: "12px", padding: "8px 12px" }}
+          >
+            <span><strong>Public Works Operator:</strong> lighting.operator@civictrace.local</span>
+            <Key size={13} color="var(--color-attention-orange)" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleQuickDemoFill("citizen.aarav@civictrace.local", "CitizenPass2026!")}
+            className="btn btn-outline btn-sm"
+            style={{ justifyContent: "space-between", fontSize: "12px", padding: "8px 12px" }}
+          >
+            <span><strong>Citizen Observer:</strong> citizen.aarav@civictrace.local</span>
+            <Key size={13} color="var(--color-verified-green)" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleQuickDemoFill("admin@civictrace.local", "AdminPass2026!")}
+            className="btn btn-outline btn-sm"
+            style={{ justifyContent: "space-between", fontSize: "12px", padding: "8px 12px" }}
+          >
+            <span><strong>Administrator:</strong> admin@civictrace.local</span>
+            <Shield size={13} color="var(--color-civic-blue)" />
+          </button>
+        </div>
       </div>
     </div>
   );

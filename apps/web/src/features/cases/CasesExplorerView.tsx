@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Case, type Category } from "../../lib/api";
+import { PageHeading, StatusStamp, SectionHeader } from "../../components/FieldPrimitives";
 import { Search } from "lucide-react";
 
 export const CasesExplorerView: React.FC = () => {
@@ -39,281 +40,262 @@ export const CasesExplorerView: React.FC = () => {
   });
 
   return (
-    <div style={{ padding: "var(--space-6) 0 var(--space-10)" }}>
-      <div className="workspace-container">
-        
-        {/* Workspace Title & Controls Bar */}
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-end",
-          flexWrap: "wrap",
-          gap: "16px",
-          paddingBottom: "var(--space-4)",
-          borderBottom: "1px solid var(--color-border)",
-          marginBottom: "var(--space-6)",
-        }}>
-          <div>
-            <div style={{
-              fontFamily: "var(--font-family-mono)",
-              fontSize: "var(--font-size-2xs)",
-              color: "var(--color-civic-blue)",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              fontWeight: 600,
-              marginBottom: "4px",
-            }}>
-              PUBLIC INFRASTRUCTURE LEDGER
-            </div>
-            <h1 style={{ fontSize: "28px", fontWeight: 700, letterSpacing: "-0.02em", color: "var(--color-text-primary)" }}>
-              Public Cases Explorer
-            </h1>
-            <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", marginTop: "2px" }}>
-              {filteredCases.length} public infrastructure dossiers recorded across Indore Central & North Ward
-            </div>
-          </div>
+    <div>
+      <PageHeading
+        eyebrow="PUBLIC INFRASTRUCTURE LEDGER &bull; INDORE MUNICIPAL REGISTRY"
+        title="Public Cases Explorer"
+        description={`${filteredCases.length} public infrastructure dossiers recorded across Indore Central & North Ward.`}
+      >
+        <Link to="/report" className="btn btn-primary">
+          Report New Issue
+        </Link>
+      </PageHeading>
 
-          {/* Filter Toolbar */}
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ position: "relative" }}>
-              <Search size={14} style={{ position: "absolute", left: "10px", top: "9px", color: "var(--color-text-muted)" }} />
-              <input
-                type="text"
-                placeholder="Search cases or locations..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  padding: "6px 12px 6px 30px",
-                  fontSize: "13px",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--radius-sm)",
-                  width: "240px",
-                  backgroundColor: "var(--color-surface)",
-                }}
-              />
-            </div>
-
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              style={{
-                padding: "6px 10px",
-                fontSize: "13px",
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-sm)",
-                backgroundColor: "var(--color-surface)",
-              }}
-            >
-              <option value="">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
-
-            <select
-              value={selectedBand}
-              onChange={(e) => setSelectedBand(e.target.value)}
-              style={{
-                padding: "6px 10px",
-                fontSize: "13px",
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-sm)",
-                backgroundColor: "var(--color-surface)",
-              }}
-            >
-              <option value="">All Priorities</option>
-              <option value="CRITICAL">Critical Priority</option>
-              <option value="HIGH">High Priority</option>
-              <option value="MEDIUM">Medium Priority</option>
-              <option value="LOW">Low Priority</option>
-            </select>
-
-            <select
-              value={selectedState}
-              onChange={(e) => setSelectedState(e.target.value)}
-              style={{
-                padding: "6px 10px",
-                fontSize: "13px",
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-sm)",
-                backgroundColor: "var(--color-surface)",
-              }}
-            >
-              <option value="">All Statuses</option>
-              <option value="SUBMITTED">Submitted</option>
-              <option value="ASSIGNED">Assigned</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="AWAITING_VERIFICATION">Awaiting Verification</option>
-              <option value="DISPUTED">Disputed</option>
-              <option value="RESOLVED">Resolved</option>
-            </select>
-          </div>
+      {/* Filter Toolbar */}
+      <div style={{
+        backgroundColor: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--radius-sm)",
+        padding: "10px 14px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexWrap: "wrap",
+        gap: "10px",
+        marginBottom: "16px",
+      }}>
+        <div style={{ position: "relative", flex: "1 1 240px", maxWidth: "340px" }}>
+          <Search size={14} style={{ position: "absolute", left: "10px", top: "9px", color: "var(--color-text-muted)" }} />
+          <input
+            type="text"
+            placeholder="Search reference, keyword, or street..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "6px 10px 6px 30px",
+              fontSize: "13px",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              backgroundColor: "var(--color-surface-elevated)",
+            }}
+          />
         </div>
 
-        {/* Master-Detail Full-Width Workspace Grid (65% Table / 35% Inspector) */}
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            style={{
+              padding: "6px 10px",
+              fontSize: "12px",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              backgroundColor: "var(--color-surface-elevated)",
+            }}
+          >
+            <option value="">All Categories ({categories.length})</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          <select
+            value={selectedBand}
+            onChange={(e) => setSelectedBand(e.target.value)}
+            style={{
+              padding: "6px 10px",
+              fontSize: "12px",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              backgroundColor: "var(--color-surface-elevated)",
+            }}
+          >
+            <option value="">All Priorities</option>
+            <option value="CRITICAL">Critical</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+          </select>
+
+          <select
+            value={selectedState}
+            onChange={(e) => setSelectedState(e.target.value)}
+            style={{
+              padding: "6px 10px",
+              fontSize: "12px",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              backgroundColor: "var(--color-surface-elevated)",
+            }}
+          >
+            <option value="">All Statuses</option>
+            <option value="SUBMITTED">Submitted</option>
+            <option value="ASSIGNED">Assigned</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="AWAITING_VERIFICATION">Awaiting Verification</option>
+            <option value="DISPUTED">Disputed</option>
+            <option value="RESOLVED">Resolved</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Master-Detail Investigation Workspace (65% Table / 35% Inspector) */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1.8fr) minmax(360px, 1fr)",
+        gap: "20px",
+        alignItems: "start",
+      }}>
+        {/* Main Dossier Ledger Table */}
         <div style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1.8fr) minmax(360px, 1fr)",
-          gap: "24px",
-          alignItems: "start",
+          backgroundColor: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-sm)",
+          overflow: "hidden",
         }}>
-          {/* Main Dossier Ledger Table */}
+          <SectionHeader title="Public Infrastructure Ledger" />
+
+          <table className="ledger-table">
+            <thead>
+              <tr>
+                <th style={{ width: "130px" }}>Reference</th>
+                <th>Defect Title & Location</th>
+                <th style={{ width: "160px" }}>Category</th>
+                <th style={{ width: "140px" }}>Status</th>
+                <th style={{ width: "80px", textAlign: "right" }}>Priority</th>
+                <th style={{ width: "70px", textAlign: "center" }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCases.map((c) => {
+                const isSelected = activeCase?.id === c.id;
+                return (
+                  <tr
+                    key={c.id}
+                    onClick={() => setActiveCase(c)}
+                    style={{
+                      backgroundColor: isSelected ? "var(--color-civic-blue-subtle)" : undefined,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <td>
+                      <span className="mono-id">{c.public_id}</span>
+                      <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "2px" }}>
+                        {c.report_count} observation(s)
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600, color: "var(--color-text-primary)", fontSize: "13px" }}>
+                        {c.title}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px" }}>
+                        📍 {c.address_reference}
+                      </div>
+                    </td>
+                    <td style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
+                      {c.category?.name}
+                    </td>
+                    <td>
+                      <StatusStamp state={c.state} size="sm" />
+                    </td>
+                    <td style={{ textAlign: "right", fontFamily: "var(--font-family-mono)", fontSize: "12px", fontWeight: 700, color: "var(--color-civic-blue)" }}>
+                      {c.priority_score.toFixed(1)}
+                    </td>
+                    <td style={{ textAlign: "center" }}>
+                      <Link to={`/cases/${c.public_id}`} className="btn btn-outline btn-sm" style={{ padding: "2px 8px" }}>
+                        Inspect
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Side Forensic Inspector */}
+        {activeCase && (
           <div style={{
             backgroundColor: "var(--color-surface)",
             border: "1px solid var(--color-border)",
             borderRadius: "var(--radius-sm)",
             overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
           }}>
-            <table className="ruled-table">
-              <thead>
-                <tr>
-                  <th style={{ width: "120px" }}>Case ID</th>
-                  <th>Defect Title & Location</th>
-                  <th style={{ width: "160px" }}>Category</th>
-                  <th style={{ width: "150px" }}>Status</th>
-                  <th style={{ width: "80px", textAlign: "right" }}>Priority</th>
-                  <th style={{ width: "80px", textAlign: "center" }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCases.map((c) => {
-                  const isSelected = activeCase?.id === c.id;
-                  return (
-                    <tr
-                      key={c.id}
-                      onClick={() => setActiveCase(c)}
-                      style={{
-                        backgroundColor: isSelected ? "var(--color-civic-blue-subtle)" : undefined,
-                        cursor: "pointer",
-                      }}
-                    >
-                      <td>
-                        <span className="mono-id">{c.public_id}</span>
-                        <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "2px" }}>
-                          {c.report_count} report(s)
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 600, color: "var(--color-text-primary)", fontSize: "14px" }}>
-                          {c.title}
-                        </div>
-                        <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px" }}>
-                          📍 {c.address_reference || "Indore Municipal Ward"}
-                        </div>
-                      </td>
-                      <td style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
-                        {c.category?.name}
-                      </td>
-                      <td>
-                        <span className={`archival-stamp stamp-${c.state.toLowerCase()}`}>
-                          {c.state.replace("_", " ")}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "right", fontFamily: "var(--font-family-mono)", fontSize: "13px", fontWeight: 700, color: "var(--color-civic-blue)" }}>
-                        {c.priority_score.toFixed(1)}
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <Link
-                          to={`/cases/${c.public_id}`}
-                          className="btn btn-outline btn-sm"
-                          style={{ padding: "3px 8px", fontSize: "11px" }}
-                        >
-                          Inspect
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Side Inspection Panel & Geographic Dossier */}
-          {activeCase && (
+            {/* Dark Inspector Header */}
             <div style={{
-              backgroundColor: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "var(--radius-sm)",
-              padding: "20px",
+              backgroundColor: "var(--color-ink-rail)",
+              color: "#FFF",
+              padding: "12px 18px",
               display: "flex",
-              flexDirection: "column",
-              gap: "16px",
+              justifyContent: "space-between",
+              alignItems: "center",
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span className="mono-id">{activeCase.public_id}</span>
-                <span className={`archival-stamp stamp-${activeCase.state.toLowerCase()}`}>
-                  {activeCase.state.replace("_", " ")}
-                </span>
-              </div>
-
               <div>
-                <h2 style={{ fontSize: "18px", fontWeight: 700, lineHeight: 1.3, color: "var(--color-text-primary)" }}>
+                <div style={{ fontSize: "10px", fontFamily: "var(--font-family-mono)", color: "var(--color-ink-rail-muted)" }}>
+                  INSPECTOR PANEL
+                </div>
+                <div style={{ fontSize: "15px", fontWeight: 700, fontFamily: "var(--font-family-mono)", color: "#FFF" }}>
+                  {activeCase.public_id}
+                </div>
+              </div>
+              <StatusStamp state={activeCase.state} size="sm" />
+            </div>
+
+            <div style={{ padding: "18px", display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div>
+                <h3 style={{ fontSize: "16px", fontWeight: 700, lineHeight: 1.3, color: "var(--color-text-primary)" }}>
                   {activeCase.title}
-                </h2>
-                <p style={{ fontSize: "13px", color: "var(--color-text-secondary)", marginTop: "8px", lineHeight: 1.5 }}>
+                </h3>
+                <p style={{ fontSize: "13px", color: "var(--color-text-secondary)", marginTop: "6px", lineHeight: 1.5 }}>
                   {activeCase.description}
                 </p>
               </div>
 
               {/* Geographic Footprint Schematic */}
               <div style={{
-                backgroundColor: "#EBECE8",
+                backgroundColor: "#EBECE7",
                 border: "1px solid var(--color-border)",
                 borderRadius: "var(--radius-sm)",
-                padding: "16px",
-                position: "relative",
+                padding: "12px 14px",
               }}>
-                <div style={{
-                  fontFamily: "var(--font-family-mono)",
-                  fontSize: "11px",
-                  color: "var(--color-text-secondary)",
-                  textAlign: "center",
-                  marginBottom: "8px",
-                }}>
-                  GEOGRAPHIC COORDINATES (WGS84 & WARD BOUNDARY)
+                <div style={{ fontSize: "10px", fontFamily: "var(--font-family-mono)", color: "var(--color-text-secondary)", textTransform: "uppercase" }}>
+                  WGS84 Coordinates &bull; Offline Grid
                 </div>
-                <div style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  fontFamily: "var(--font-family-mono)",
-                  textAlign: "center",
-                  color: "var(--color-civic-blue)",
-                }}>
+                <div style={{ fontSize: "13px", fontFamily: "var(--font-family-mono)", fontWeight: 600, color: "var(--color-civic-blue)", marginTop: "2px" }}>
                   LAT: {activeCase.latitude.toFixed(6)} | LON: {activeCase.longitude.toFixed(6)}
                 </div>
-                <div style={{ fontSize: "12px", color: "var(--color-text-muted)", textAlign: "center", marginTop: "4px" }}>
+                <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px" }}>
                   📍 {activeCase.address_reference}
-                </div>
-                <div style={{ fontSize: "10px", color: "var(--color-text-muted)", textAlign: "center", marginTop: "2px" }}>
-                  Verified Geographic Footprint: Indore Municipal Ward 34 &bull; Offline Grid Active
                 </div>
               </div>
 
-              {/* Priority Score Breakdown */}
+              {/* Explainable Civic Priority */}
               <div style={{
                 backgroundColor: "var(--color-surface-elevated)",
                 border: "1px solid var(--color-border)",
-                padding: "12px 16px",
                 borderRadius: "var(--radius-sm)",
+                padding: "12px 14px",
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)" }}>
-                    Explainable Civic Priority: {activeCase.priority_score.toFixed(1)} / 10
+                  <span style={{ fontSize: "12px", fontWeight: 600 }}>
+                    Priority: {activeCase.priority_score.toFixed(1)} / 10
                   </span>
                   <span className="mono-id">{activeCase.priority_band}</span>
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>
-                  Calculated by deterministic civic policy (corroborated reports + intrinsic hazard weight + duration).
+                  Deterministic civic policy (hazard category + {activeCase.report_count} observations + duration).
                 </div>
               </div>
 
-              <Link to={`/cases/${activeCase.public_id}`} className="btn btn-primary" style={{ width: "100%" }}>
+              <Link to={`/cases/${activeCase.public_id}`} className="btn btn-dark" style={{ width: "100%", justifyContent: "center" }}>
                 Open Complete Forensic Dossier &rarr;
               </Link>
             </div>
-          )}
-        </div>
-
+          </div>
+        )}
       </div>
     </div>
   );

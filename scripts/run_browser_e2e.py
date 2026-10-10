@@ -17,6 +17,16 @@ def run_real_e2e_lifecycle():
     print("  CIVICTRACE REAL BROWSER E2E INTERACTIVE WORKFLOW VERIFICATION")
     print("=====================================================================")
     
+    # Ensure pristine reproducible database state in services/api directory
+    api_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "services", "api"))
+    orig_cwd = os.getcwd()
+    try:
+        os.chdir(api_dir)
+        from app.db.seed import seed_database
+        seed_database(reset=True)
+    finally:
+        os.chdir(orig_cwd)
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(viewport={"width": 1280, "height": 850})
@@ -60,7 +70,7 @@ def run_real_e2e_lifecycle():
 
         # Get the new case's public ID from API
         cases_res = httpx.get(f"{API_BASE}/cases").json()
-        new_case = next((c for c in cases_res if "Hazardous Exposed Cable Conduit" in c["title"]), None)
+        new_case = next((c for c in cases_res if defect_title in c["title"]), None)
         assert new_case is not None, "Failed to find created case in API"
         case_public_id = new_case["public_id"]
         case_uuid = new_case["id"]

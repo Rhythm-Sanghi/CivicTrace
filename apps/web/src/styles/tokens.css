@@ -1,24 +1,39 @@
-/* CivicTrace: Workshop + Gridline + Studio Utility Design Tokens */
+/* CivicTrace: Field Ledger Design System (Workshop + Gridline + Studio Utility) */
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* Disciplined Material Palette */
+  /* Field Ledger Contrast Palette */
+  --color-paper: #F5F4F0;
   --color-canvas: #F5F4F0;
+  
+  /* Dark-Ink Industrial Rail & Headers */
+  --color-ink-rail: #191E1A;
+  --color-ink-rail-border: #2A332C;
+  --color-ink-rail-hover: #232A24;
+  --color-ink-rail-active: #2D382F;
+  --color-ink-rail-text: #E5EAE4;
+  --color-ink-rail-muted: #8E998F;
+  
+  /* Warm Technical Surfaces */
   --color-surface: #FFFFFF;
-  --color-surface-elevated: #FAFAF8;
-  --color-surface-subtle: #ECECE6;
-  --color-surface-muted: #E2E2DA;
-
+  --color-surface-elevated: #FAF9F6;
+  --color-surface-subtle: #EFEFEA;
+  --color-surface-muted: #E5E5DE;
+  
+  /* Ink Typography */
+  --color-ink: #202722;
   --color-text-primary: #202722;
   --color-text-secondary: #68716B;
   --color-text-muted: #8F9992;
   --color-text-inverse: #FFFFFF;
 
+  /* Fine Architectural Borders */
   --color-border: #D9DED8;
   --color-border-subtle: #E8ECE7;
   --color-border-strong: #A6AFA4;
+  --color-border-dark: #2A332C;
 
-  /* Functional Civic Accents */
+  /* Restrained State Accents */
   --color-civic-blue: #285E79;
   --color-civic-blue-hover: #1E495E;
   --color-civic-blue-subtle: #EDF4F7;
@@ -38,12 +53,12 @@
 
   --font-size-2xs: 0.6875rem; /* 11px */
   --font-size-xs: 0.75rem;    /* 12px */
-  --font-size-sm: 0.84375rem; /* 13.5px */
-  --font-size-base: 0.9375rem;/* 15px */
-  --font-size-md: 1.0625rem;  /* 17px */
-  --font-size-lg: 1.25rem;    /* 20px */
-  --font-size-xl: 1.5rem;     /* 24px */
-  --font-size-2xl: 1.875rem;  /* 30px */
+  --font-size-sm: 0.8125rem;  /* 13px */
+  --font-size-base: 0.875rem; /* 14px */
+  --font-size-md: 1rem;       /* 16px */
+  --font-size-lg: 1.1875rem;  /* 19px */
+  --font-size-xl: 1.375rem;   /* 22px */
+  --font-size-2xl: 1.75rem;   /* 28px */
   --font-size-3xl: 2.25rem;   /* 36px */
 
   --font-weight-regular: 400;
@@ -51,30 +66,24 @@
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
-  /* Spacing Rhythm (4px baseline scale) */
-  --space-1: 0.25rem;  /* 4px */
-  --space-2: 0.5rem;   /* 8px */
-  --space-3: 0.75rem;  /* 12px */
-  --space-4: 1rem;     /* 16px */
-  --space-5: 1.25rem;  /* 20px */
-  --space-6: 1.5rem;   /* 24px */
-  --space-8: 2rem;     /* 32px */
-  --space-10: 2.5rem;  /* 40px */
-  --space-12: 3rem;    /* 48px */
+  /* Spatial Rhythm */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
 
-  /* Structural Geometry */
-  --radius-none: 0px;
+  /* Radii (Technical, sharp precision: 2px - 3px max) */
   --radius-sm: 2px;
   --radius-md: 3px;
   --radius-lg: 4px;
 
-  /* Shadows (Subtle architectural lines rather than heavy blur) */
-  --shadow-subtle: 0 1px 2px rgba(32, 39, 34, 0.04);
-  --shadow-card: 0 1px 3px rgba(32, 39, 34, 0.06);
-
   /* Transitions */
   --transition-fast: 120ms ease;
-  --transition-normal: 200ms ease;
+  --transition-normal: 180ms ease;
 }
 
 *, *::before, *::after {
@@ -85,42 +94,295 @@
 
 html, body {
   width: 100%;
-  min-height: 100%;
-  background-color: var(--color-canvas);
+  height: 100%;
+  background-color: var(--color-paper);
   color: var(--color-text-primary);
   font-family: var(--font-family-sans);
   font-size: var(--font-size-base);
-  line-height: 1.5;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Fluid Full-Width Workspace Container: 24-40px responsive horizontal gutters */
-.workspace-container {
+#root {
   width: 100%;
-  max-width: 1920px;
-  margin: 0 auto;
-  padding-left: clamp(16px, 2.5vw, 40px);
-  padding-right: clamp(16px, 2.5vw, 40px);
+  min-height: 100%;
+  display: flex;
 }
 
-/* Backward compatibility fallback */
-.container {
+/* Master Field Ledger App Shell */
+.field-shell {
+  display: flex;
   width: 100%;
-  max-width: 1920px;
-  margin: 0 auto;
-  padding-left: clamp(16px, 2.5vw, 40px);
-  padding-right: clamp(16px, 2.5vw, 40px);
+  min-height: 100vh;
+  background-color: var(--color-paper);
+}
+
+/* Dark-Ink Navigation Rail */
+.nav-rail {
+  width: 236px;
+  min-width: 236px;
+  background-color: var(--color-ink-rail);
+  border-right: 1px solid var(--color-ink-rail-border);
+  color: var(--color-ink-rail-text);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 90;
+  user-select: none;
+}
+
+.nav-rail-header {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--color-ink-rail-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-rail-brand {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-rail-logo {
+  width: 26px;
+  height: 26px;
+  background-color: var(--color-civic-blue);
+  color: #FFF;
+  font-family: var(--font-family-mono);
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.nav-rail-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #FFF;
+  line-height: 1.1;
+}
+
+.nav-rail-subtitle {
+  font-size: 10px;
+  font-family: var(--font-family-mono);
+  color: var(--color-ink-rail-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nav-rail-group {
+  padding: 14px 10px 4px;
+}
+
+.nav-rail-label {
+  padding: 0 10px 6px;
+  font-size: 10px;
+  font-family: var(--font-family-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-rail-muted);
+  font-weight: 600;
+}
+
+.nav-rail-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  color: var(--color-ink-rail-muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  margin-bottom: 2px;
+}
+
+.nav-rail-link:hover {
+  background-color: var(--color-ink-rail-hover);
+  color: #FFF;
+}
+
+.nav-rail-link.active {
+  background-color: var(--color-ink-rail-active);
+  color: #FFF;
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--color-civic-blue);
+}
+
+.nav-rail-badge {
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--color-ink-rail-muted);
+}
+
+.nav-rail-footer {
+  margin-top: auto;
+  padding: 12px 14px;
+  border-top: 1px solid var(--color-ink-rail-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Main Workspace Canvas (Occupies remaining width) */
+.field-canvas {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Slim Utility Header */
+.utility-header {
+  height: 44px;
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.utility-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+}
+
+.utility-telemetry {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+}
+
+.pulse-indicator {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--color-verified-green);
+  box-shadow: 0 0 0 2px rgba(57, 115, 90, 0.2);
+}
+
+/* Fluid Content Area */
+.field-content {
+  flex: 1;
+  padding: 24px 32px 48px;
+  max-width: 1720px;
+  width: 100%;
+}
+
+/* Shared Primitives */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 20px;
+}
+
+.page-eyebrow {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  color: var(--color-civic-blue);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+  line-height: 1.15;
+}
+
+.page-description {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+  max-width: 840px;
+}
+
+/* Field Metric Strip */
+.metric-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.metric-cell {
+  padding: 14px 18px;
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+.metric-cell:last-child {
+  border-right: none;
+}
+
+.metric-cell-label {
+  font-size: 11px;
+  font-family: var(--font-family-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.metric-cell-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-top: 2px;
+  font-family: var(--font-family-sans);
+}
+
+.metric-cell-desc {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
 }
 
 /* Workshop Utility Typography & Stamps */
 .mono-id {
   font-family: var(--font-family-mono);
-  font-size: var(--font-size-xs);
+  font-size: 11px;
   letter-spacing: 0.02em;
-  font-weight: var(--font-weight-medium);
+  font-weight: 500;
   background-color: var(--color-surface-subtle);
   border: 1px solid var(--color-border);
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: var(--radius-sm);
   color: var(--color-text-primary);
   display: inline-block;
@@ -128,11 +390,11 @@ html, body {
 
 .archival-stamp {
   font-family: var(--font-family-mono);
-  font-size: 0.6875rem;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-weight: var(--font-weight-semibold);
-  padding: 2px 7px;
+  font-weight: 600;
+  padding: 2px 6px;
   border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
@@ -174,11 +436,11 @@ html, body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: 6px;
   font-family: var(--font-family-sans);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   border: 1px solid transparent;
@@ -189,7 +451,7 @@ html, body {
 
 .btn-primary {
   background-color: var(--color-civic-blue);
-  color: var(--color-text-inverse);
+  color: #FFF;
   border-color: var(--color-civic-blue);
 }
 
@@ -209,70 +471,83 @@ html, body {
   border-color: var(--color-border-strong);
 }
 
-.btn-sm {
-  padding: 5px 10px;
-  font-size: var(--font-size-xs);
+.btn-dark {
+  background-color: var(--color-ink-rail);
+  color: #FFF;
+  border-color: var(--color-ink-rail-border);
 }
 
-/* Gridline Surface Panels */
-.card {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-5);
-  box-shadow: var(--shadow-subtle);
+.btn-dark:hover {
+  background-color: var(--color-ink-rail-hover);
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 11px;
 }
 
 /* Ruled Ledger Table */
-.ruled-table {
+.ledger-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--font-size-sm);
+  font-size: 13px;
 }
 
-.ruled-table th {
+.ledger-table th {
   text-align: left;
-  padding: var(--space-3) var(--space-4);
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--font-size-xs);
-  letter-spacing: 0.03em;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-text-secondary);
   border-bottom: 2px solid var(--color-border);
   background-color: var(--color-surface-elevated);
 }
 
-.ruled-table td {
-  padding: var(--space-3) var(--space-4);
+.ledger-table td {
+  padding: 10px 14px;
   border-bottom: 1px solid var(--color-border-subtle);
   vertical-align: middle;
 }
 
-.ruled-table tr:hover td {
+.ledger-table tr:hover td {
   background-color: #FAFAF7;
 }
 
-/* Grid Layout Helpers */
-.grid-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 18px;
-  background-color: var(--color-surface-elevated);
-  border-bottom: 1px solid var(--color-border);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-secondary);
-}
-
-/* Responsive Breakpoints & Shell Utilities */
-@media (max-width: 860px) {
-  .desktop-nav {
-    display: none !important;
+/* Mobile & Tablet Responsive Media Queries */
+@media (max-width: 960px) {
+  .field-shell {
+    flex-direction: column;
   }
-  .mobile-menu-toggle {
-    display: inline-flex !important;
+  .nav-rail {
+    width: 100%;
+    min-width: 100%;
+    height: auto;
+    position: relative;
+    border-right: none;
+    border-bottom: 1px solid var(--color-ink-rail-border);
+  }
+  .nav-rail-group {
+    display: flex;
+    flex-wrap: wrap;
+    padding: 6px 10px;
+  }
+  .nav-rail-label {
+    display: none;
+  }
+  .field-content {
+    padding: 16px;
+  }
+  .utility-header {
+    height: auto;
+    min-height: 38px;
+    padding: 8px 16px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .utility-telemetry {
+    font-size: 10px;
+    gap: 8px;
   }
 }

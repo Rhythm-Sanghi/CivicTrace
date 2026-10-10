@@ -23,7 +23,7 @@ ROLE_TRANSITION_PERMISSIONS: Dict[CaseState, Set[UserRole]] = {
     CaseState.VERIFIED: {UserRole.REVIEWER, UserRole.ADMINISTRATOR},
     CaseState.REJECTED: {UserRole.REVIEWER, UserRole.ADMINISTRATOR},
     CaseState.ASSIGNED: {UserRole.REVIEWER, UserRole.OPERATOR, UserRole.ADMINISTRATOR},
-    CaseState.IN_PROGRESS: {UserRole.OPERATOR, UserRole.ADMINISTRATOR},
+    CaseState.IN_PROGRESS: {UserRole.OPERATOR, UserRole.REVIEWER, UserRole.ADMINISTRATOR},
     CaseState.RESOLUTION_CLAIMED: {UserRole.OPERATOR, UserRole.ADMINISTRATOR},
     CaseState.AWAITING_VERIFICATION: {UserRole.OPERATOR, UserRole.REVIEWER, UserRole.ADMINISTRATOR},
     CaseState.RESOLVED: {UserRole.REVIEWER, UserRole.ADMINISTRATOR}, # Operators CANNOT self-resolve!

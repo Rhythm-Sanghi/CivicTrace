@@ -2,22 +2,26 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
-import { Header } from "../components/Header";
+import { AppShell } from "../components/AppShell";
 import { LoginView } from "../features/auth/LoginView";
 
 describe("Frontend Core Components & Design System", () => {
-  it("renders Header brand and primary navigation items", () => {
+  it("renders AppShell brand and primary navigation items", () => {
     render(
       <MemoryRouter>
-        <Header />
+        <AppShell>
+          <div>Child workspace</div>
+        </AppShell>
       </MemoryRouter>
     );
 
     expect(screen.getByText("CivicTrace")).toBeInTheDocument();
-    expect(screen.getByText("Public Evidence Ledger")).toBeInTheDocument();
-    expect(screen.getByText("Public Cases")).toBeInTheDocument();
-    expect(screen.getByText("Intelligence & Metrics")).toBeInTheDocument();
+    expect(screen.getByText("Field Ledger Standard")).toBeInTheDocument();
+    expect(screen.getByText("Overview")).toBeInTheDocument();
+    expect(screen.getByText("Case Explorer")).toBeInTheDocument();
+    expect(screen.getByText("Intelligence")).toBeInTheDocument();
     expect(screen.getByText("Report Issue")).toBeInTheDocument();
+    expect(screen.getByText("Child workspace")).toBeInTheDocument();
   });
 
   it("renders Login view with demo role credentials", () => {

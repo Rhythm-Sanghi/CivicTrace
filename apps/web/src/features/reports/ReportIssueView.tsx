@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type Category } from "../../lib/api";
-import { MapPin, CheckCircle, Send, ArrowRight, ShieldAlert } from "lucide-react";
+import { PageHeading, SectionHeader } from "../../components/FieldPrimitives";
+import { MapPin, CheckCircle, Send, ShieldAlert, ArrowRight } from "lucide-react";
 
 export const ReportIssueView: React.FC = () => {
   const navigate = useNavigate();
@@ -56,7 +57,6 @@ export const ReportIssueView: React.FC = () => {
         guest_pseudonym: pseudonym || undefined,
       });
 
-      // If citizen selected an evidence file, upload it immediately attached to this report
       if (evidenceFile) {
         try {
           await api.uploadEvidence(res.id, evidenceFile, "Initial observation photo evidence");
@@ -74,107 +74,89 @@ export const ReportIssueView: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: "var(--space-6) 0 var(--space-12)" }}>
-      <div className="workspace-container">
-        
-        {/* Workspace Breadcrumb & Header */}
-        <div style={{
-          borderBottom: "1px solid var(--color-border)",
-          paddingBottom: "var(--space-4)",
-          marginBottom: "var(--space-6)",
-        }}>
-          <div style={{
-            fontFamily: "var(--font-family-mono)",
-            fontSize: "var(--font-size-2xs)",
-            color: "var(--color-civic-blue)",
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            fontWeight: 600,
-            marginBottom: "4px",
-          }}>
-            CIVIC INTAKE PORTAL &bull; INDORE MUNICIPAL WARD 34
-          </div>
-          <h1 style={{ fontSize: "28px", fontWeight: 700, letterSpacing: "-0.02em", color: "var(--color-text-primary)" }}>
-            Report an Infrastructure Defect
-          </h1>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: "14px", marginTop: "2px" }}>
-            Submit an individual public observation. CivicTrace will automatically compute duplicate similarity against existing cases and initiate cryptographic evidence tracking.
-          </p>
-        </div>
+    <div>
+      <PageHeading
+        eyebrow="CIVIC INTAKE PORTAL &bull; INDORE MUNICIPAL WARD 34"
+        title="Report an Infrastructure Defect"
+        description="Submit an individual public observation. CivicTrace will automatically compute duplicate similarity against existing cases and initiate cryptographic evidence tracking."
+      />
 
-        {successResult ? (
+      {successResult ? (
+        <div style={{
+          maxWidth: "760px",
+          backgroundColor: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderLeft: "4px solid var(--color-verified-green)",
+          borderRadius: "var(--radius-sm)",
+          padding: "24px",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+            <CheckCircle size={22} color="var(--color-verified-green)" />
+            <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-verified-green)" }}>
+              Observation Successfully Registered
+            </h2>
+          </div>
+
+          <p style={{ fontSize: "14px", color: "var(--color-text-secondary)", marginBottom: "16px", lineHeight: 1.5 }}>
+            Your field observation has been registered into the append-only ledger and submitted to the deterministic correlation engine.
+          </p>
+
           <div style={{
-            maxWidth: "780px",
+            backgroundColor: "var(--color-surface-elevated)",
+            border: "1px solid var(--color-border-subtle)",
+            padding: "12px 16px",
+            borderRadius: "var(--radius-sm)",
+            fontSize: "13px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "6px",
+            marginBottom: "18px",
+          }}>
+            <div><strong>Report Reference:</strong> <span className="mono-id">{successResult.public_id}</span></div>
+            <div><strong>Hazard:</strong> {successResult.title}</div>
+            <div><strong>Coordinates:</strong> {successResult.latitude.toFixed(5)}, {successResult.longitude.toFixed(5)}</div>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button
+              onClick={() => navigate("/explorer")}
+              className="btn btn-primary"
+            >
+              View in Public Cases Explorer <ArrowRight size={14} />
+            </button>
+            <button
+              onClick={() => {
+                setSuccessResult(null);
+                setTitle("");
+                setDescription("");
+                setAddressRef("");
+              }}
+              className="btn btn-outline"
+            >
+              Submit Another Observation
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1.6fr) minmax(320px, 1fr)",
+          gap: "24px",
+          alignItems: "start",
+        }}>
+          {/* Main Intake Form Card */}
+          <div style={{
             backgroundColor: "var(--color-surface)",
             border: "1px solid var(--color-border)",
-            borderLeft: "4px solid var(--color-verified-green)",
             borderRadius: "var(--radius-sm)",
-            padding: "24px",
+            overflow: "hidden",
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-              <CheckCircle size={24} color="var(--color-verified-green)" />
-              <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-verified-green)" }}>
-                Observation Successfully Registered
-              </h2>
-            </div>
+            <SectionHeader title="Defect Intake Form" />
 
-            <p style={{ fontSize: "14px", color: "var(--color-text-secondary)", marginBottom: "16px", lineHeight: 1.5 }}>
-              Your field observation has been recorded and submitted to the deterministic correlation engine.
-            </p>
-
-            <div style={{
-              backgroundColor: "var(--color-surface-elevated)",
-              border: "1px solid var(--color-border-subtle)",
-              padding: "14px 18px",
-              borderRadius: "var(--radius-sm)",
-              fontSize: "13px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-              marginBottom: "20px",
-            }}>
-              <div><strong>Report Reference:</strong> <span className="mono-id">{successResult.public_id}</span></div>
-              <div><strong>Infrastructure Hazard:</strong> {successResult.title}</div>
-              <div><strong>Location Coordinates:</strong> {successResult.latitude.toFixed(5)}, {successResult.longitude.toFixed(5)}</div>
-            </div>
-
-            <div style={{ display: "flex", gap: "12px" }}>
-              <button
-                onClick={() => navigate("/explorer")}
-                className="btn btn-primary"
-              >
-                View in Public Cases Explorer <ArrowRight size={14} />
-              </button>
-              <button
-                onClick={() => {
-                  setSuccessResult(null);
-                  setTitle("");
-                  setDescription("");
-                  setAddressRef("");
-                }}
-                className="btn btn-outline"
-              >
-                Submit Another Observation
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1.6fr) minmax(320px, 1fr)",
-            gap: "28px",
-            alignItems: "start",
-          }}>
-            {/* Primary Intake Form Card */}
-            <div style={{
-              backgroundColor: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "var(--radius-sm)",
-              padding: "24px",
-            }}>
+            <div style={{ padding: "20px" }}>
               {errorMsg && (
                 <div style={{
-                  padding: "12px 14px",
+                  padding: "10px 14px",
                   borderRadius: "var(--radius-sm)",
                   fontSize: "13px",
                   marginBottom: "16px",
@@ -184,14 +166,14 @@ export const ReportIssueView: React.FC = () => {
                   alignItems: "center",
                   gap: "8px",
                 }}>
-                  <ShieldAlert size={16} /> {errorMsg}
+                  <ShieldAlert size={15} /> {errorMsg}
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+              <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                    Infrastructure Hazard Category
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
+                    Hazard Category
                   </label>
                   <select
                     value={categoryId}
@@ -199,8 +181,8 @@ export const ReportIssueView: React.FC = () => {
                     required
                     style={{
                       width: "100%",
-                      padding: "8px 12px",
-                      fontSize: "14px",
+                      padding: "8px 10px",
+                      fontSize: "13px",
                       border: "1px solid var(--color-border)",
                       borderRadius: "var(--radius-sm)",
                       backgroundColor: "var(--color-surface)",
@@ -213,7 +195,7 @@ export const ReportIssueView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
                     Brief Summary / Title
                   </label>
                   <input
@@ -224,8 +206,8 @@ export const ReportIssueView: React.FC = () => {
                     required
                     style={{
                       width: "100%",
-                      padding: "8px 12px",
-                      fontSize: "14px",
+                      padding: "8px 10px",
+                      fontSize: "13px",
                       border: "1px solid var(--color-border)",
                       borderRadius: "var(--radius-sm)",
                     }}
@@ -233,8 +215,8 @@ export const ReportIssueView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                    Observed Problem Details & Physical Severity
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
+                    Observed Details & Severity
                   </label>
                   <textarea
                     rows={4}
@@ -244,8 +226,8 @@ export const ReportIssueView: React.FC = () => {
                     required
                     style={{
                       width: "100%",
-                      padding: "8px 12px",
-                      fontSize: "14px",
+                      padding: "8px 10px",
+                      fontSize: "13px",
                       border: "1px solid var(--color-border)",
                       borderRadius: "var(--radius-sm)",
                       lineHeight: 1.5,
@@ -257,23 +239,25 @@ export const ReportIssueView: React.FC = () => {
                 <div style={{
                   backgroundColor: "var(--color-surface-elevated)",
                   border: "1px solid var(--color-border)",
-                  padding: "16px",
+                  padding: "14px",
                   borderRadius: "var(--radius-sm)",
                 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 600 }}>Geographic Location (Indore Grid)</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-secondary)" }}>
+                      Geographic Location (Indore Grid)
+                    </span>
                     <button
                       type="button"
                       onClick={handleUseBrowserLocation}
                       className="btn btn-outline btn-sm"
                     >
-                      <MapPin size={13} /> Use Device GPS
+                      <MapPin size={12} /> Use GPS
                     </button>
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
                     <div>
-                      <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", marginBottom: "4px" }}>Latitude</label>
+                      <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", marginBottom: "2px" }}>Latitude</label>
                       <input
                         type="number"
                         step="any"
@@ -282,8 +266,8 @@ export const ReportIssueView: React.FC = () => {
                         required
                         style={{
                           width: "100%",
-                          padding: "6px 10px",
-                          fontSize: "13px",
+                          padding: "6px 8px",
+                          fontSize: "12px",
                           fontFamily: "var(--font-family-mono)",
                           border: "1px solid var(--color-border)",
                           borderRadius: "var(--radius-sm)",
@@ -291,7 +275,7 @@ export const ReportIssueView: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", marginBottom: "4px" }}>Longitude</label>
+                      <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", marginBottom: "2px" }}>Longitude</label>
                       <input
                         type="number"
                         step="any"
@@ -300,8 +284,8 @@ export const ReportIssueView: React.FC = () => {
                         required
                         style={{
                           width: "100%",
-                          padding: "6px 10px",
-                          fontSize: "13px",
+                          padding: "6px 8px",
+                          fontSize: "12px",
                           fontFamily: "var(--font-family-mono)",
                           border: "1px solid var(--color-border)",
                           borderRadius: "var(--radius-sm)",
@@ -311,7 +295,7 @@ export const ReportIssueView: React.FC = () => {
                   </div>
 
                   <div>
-                    <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", marginBottom: "4px" }}>Street / Landmark Reference</label>
+                    <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", marginBottom: "2px" }}>Street Reference</label>
                     <input
                       type="text"
                       placeholder="e.g. Near Rajwada Palace, MG Road crossing"
@@ -319,8 +303,8 @@ export const ReportIssueView: React.FC = () => {
                       onChange={(e) => setAddressRef(e.target.value)}
                       style={{
                         width: "100%",
-                        padding: "6px 10px",
-                        fontSize: "13px",
+                        padding: "6px 8px",
+                        fontSize: "12px",
                         border: "1px solid var(--color-border)",
                         borderRadius: "var(--radius-sm)",
                       }}
@@ -328,9 +312,9 @@ export const ReportIssueView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Evidence Photo Upload */}
+                {/* Photo Evidence Input */}
                 <div>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "4px" }}>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
                     Attach Photo Evidence (Optional)
                   </label>
                   <input
@@ -341,20 +325,14 @@ export const ReportIssueView: React.FC = () => {
                         setEvidenceFile(e.target.files[0]);
                       }
                     }}
-                    style={{
-                      fontSize: "13px",
-                      color: "var(--color-text-secondary)",
-                    }}
+                    style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}
                   />
-                  <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>
-                    Files are validated for MIME type, byte integrity, and hashed into the public evidence archive.
-                  </div>
                 </div>
 
                 {/* Submitter Pseudonym */}
                 <div>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "4px" }}>
-                    Observer Pseudonym / Attribution (Optional)
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
+                    Observer Attribution (Optional)
                   </label>
                   <input
                     type="text"
@@ -363,8 +341,8 @@ export const ReportIssueView: React.FC = () => {
                     onChange={(e) => setPseudonym(e.target.value)}
                     style={{
                       width: "100%",
-                      padding: "8px 12px",
-                      fontSize: "14px",
+                      padding: "8px 10px",
+                      fontSize: "13px",
                       border: "1px solid var(--color-border)",
                       borderRadius: "var(--radius-sm)",
                     }}
@@ -375,58 +353,54 @@ export const ReportIssueView: React.FC = () => {
                   type="submit"
                   disabled={loading}
                   className="btn btn-primary"
-                  style={{ alignSelf: "flex-start", marginTop: "6px" }}
+                  style={{ alignSelf: "flex-start", marginTop: "4px" }}
                 >
-                  <Send size={14} /> {loading ? "Registering Observation..." : "Submit Observation to Ledger"}
+                  <Send size={13} /> {loading ? "Registering..." : "Submit Observation to Ledger"}
                 </button>
               </form>
             </div>
+          </div>
 
-            {/* Explanatory Sidebar Card */}
-            <div style={{
-              backgroundColor: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "var(--radius-sm)",
-              padding: "20px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "16px",
-            }}>
-              <div className="grid-header" style={{ margin: "-20px -20px 0", borderRadius: "var(--radius-sm) var(--radius-sm) 0 0" }}>
-                <span>Accountability Standards</span>
-              </div>
+          {/* Standards Sidebar */}
+          <div style={{
+            backgroundColor: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-sm)",
+            overflow: "hidden",
+          }}>
+            <SectionHeader title="Verification Standards" />
 
+            <div style={{ padding: "18px", display: "flex", flexDirection: "column", gap: "14px" }}>
               <div>
-                <h3 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "6px" }}>
-                  1. Automatic Duplicate Correlation
-                </h3>
-                <p style={{ fontSize: "12px", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
-                  If other citizens have reported the same issue nearby, CivicTrace calculates Haversine proximity and text token similarity to consolidate evidence rather than creating disconnected tickets.
+                <h4 style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                  1. Duplicate Correlation
+                </h4>
+                <p style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px", lineHeight: 1.5 }}>
+                  Submissions near an existing defect are correlated via Haversine distance and token similarity into a single case dossier.
                 </p>
               </div>
 
               <div>
-                <h3 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "6px" }}>
-                  2. Transparent Civic Priority
-                </h3>
-                <p style={{ fontSize: "12px", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
-                  Reports automatically receive an explainable priority score based on intrinsic hazard severity and corroboration count.
+                <h4 style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                  2. Priority Scoring
+                </h4>
+                <p style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px", lineHeight: 1.5 }}>
+                  The priority engine ranks civic risk from 1 to 10 based on hazard class, corroborating reports, and unresolved days.
                 </p>
               </div>
 
               <div>
-                <h3 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "6px" }}>
-                  3. Append-Only Provenance
-                </h3>
-                <p style={{ fontSize: "12px", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
-                  Every observation creates an immutable audit event on a sequential SHA-256 ledger. No administrator can delete a report without invalidating the chain.
+                <h4 style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                  3. Verification Gate
+                </h4>
+                <p style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px", lineHeight: 1.5 }}>
+                  Public works repair claims do not close a case without independent citizen or reviewer inspection.
                 </p>
               </div>
             </div>
           </div>
-        )}
-
-      </div>
+        </div>
+      )}
     </div>
   );
 };
