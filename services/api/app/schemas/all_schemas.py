@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from app.models.entities import (
     UserRole,
     CaseState,
@@ -30,8 +30,7 @@ class UserPublic(BaseModel):
     department_id: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class Token(BaseModel):
     access_token: str
@@ -43,11 +42,10 @@ class CategoryPublic(BaseModel):
     id: str
     name: str
     code: str
-    description: Optional[str]
+    description: Optional[str] = None
     default_severity_weight: float
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Evidence Asset
 class EvidenceAssetPublic(BaseModel):
@@ -56,11 +54,10 @@ class EvidenceAssetPublic(BaseModel):
     file_size: int
     mime_type: str
     sha256_hash: str
-    caption: Optional[str]
+    caption: Optional[str] = None
     uploaded_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Report schemas
 class ReportCreate(BaseModel):
@@ -82,15 +79,14 @@ class ReportPublic(BaseModel):
     description: str
     latitude: float
     longitude: float
-    address_reference: Optional[str]
+    address_reference: Optional[str] = None
     moderation_status: ReportModerationStatus
-    case_id: Optional[str]
-    guest_pseudonym: Optional[str]
+    case_id: Optional[str] = None
+    guest_pseudonym: Optional[str] = None
     created_at: datetime
     evidence_assets: List[EvidenceAssetPublic] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Case schemas
 class CasePublic(BaseModel):
@@ -103,19 +99,18 @@ class CasePublic(BaseModel):
     description: str
     latitude: float
     longitude: float
-    address_reference: Optional[str]
+    address_reference: Optional[str] = None
     state: CaseState
     priority_score: float
     priority_band: PriorityBand
-    priority_breakdown: Optional[str]
+    priority_breakdown: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    verified_at: Optional[datetime]
-    resolved_at: Optional[datetime]
+    verified_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
     report_count: Optional[int] = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Duplicate Candidate
 class DuplicateCandidatePublic(BaseModel):
@@ -133,8 +128,7 @@ class DuplicateCandidatePublic(BaseModel):
     created_at: datetime
     target_case: Optional[CasePublic] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DuplicateDecision(BaseModel):
     decision: str # "APPROVE" or "REJECT"
@@ -153,8 +147,7 @@ class CaseEventPublic(BaseModel):
     current_event_hash: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class CaseEventChainValidation(BaseModel):
     case_id: str
@@ -177,8 +170,7 @@ class ResolutionClaimPublic(BaseModel):
     status: str
     evidence_assets: List[EvidenceAssetPublic] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Verification
 class VerificationCreate(BaseModel):
@@ -193,11 +185,10 @@ class VerificationPublic(BaseModel):
     notes: str
     is_dispute: bool
     submitted_at: datetime
-    guest_pseudonym: Optional[str]
+    guest_pseudonym: Optional[str] = None
     evidence_assets: List[EvidenceAssetPublic] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Recurrence
 class RecurrencePublic(BaseModel):
@@ -212,8 +203,7 @@ class RecurrencePublic(BaseModel):
     created_at: datetime
     prior_case: Optional[CasePublic] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Neighborhood Metrics
 class NeighborhoodStats(BaseModel):

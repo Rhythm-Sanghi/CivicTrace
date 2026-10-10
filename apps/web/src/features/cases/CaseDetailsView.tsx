@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, type Case, type CaseEvent } from "../../lib/api";
+import { api, getCurrentUser, type Case, type CaseEvent } from "../../lib/api";
 import {
   ShieldCheck,
   History,
@@ -14,6 +14,7 @@ export const CaseDetailsView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [caseItem, setCaseItem] = useState<Case | null>(null);
   const [events, setEvents] = useState<CaseEvent[]>([]);
+  const user = getCurrentUser();
   const [ledgerValidation, setLedgerValidation] = useState<{
     is_valid: boolean;
     total_events: number;
@@ -142,6 +143,87 @@ export const CaseDetailsView: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {/* Reviewer / Operator Role Transition Controls */}
+          {user && (user.role === "REVIEWER" || user.role === "ADMINISTRATOR" || user.role === "OPERATOR") && (
+            <div style={{
+              marginTop: "16px",
+              padding: "12px",
+              backgroundColor: "var(--color-surface-elevated)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "10px",
+            }}>
+              <div style={{ fontSize: "13px" }}>
+                <strong>Role Action Panel ({user.role}):</strong> Current case state is <span className="mono-id">{caseItem.state}</span>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                {(user.role === "REVIEWER" || user.role === "ADMINISTRATOR") && caseItem.state === "SUBMITTED" && (
+                  <button
+                    onClick={async () => {
+                      await api.transitionCase(caseItem.id, "VERIFIED", "Reviewer ground corroboration complete");
+                      loadData();
+                    }}
+                    className="btn btn-primary btn-sm"
+                  >
+                    Verify Case &rarr;
+                  </button>
+                )}
+
+                {(user.role === "REVIEWER" || user.role === "ADMINISTRATOR") && caseItem.state === "DISPUTED" && (
+                  <>
+                    <button
+                      onClick={async () => {
+                        await api.transitionCase(caseItem.id, "IN_PROGRESS", "Dispute sustained; ordered department rework");
+                        loadData();
+                      }}
+                      className="btn btn-primary btn-sm"
+                    >
+                      Order Department Rework (In Progress)
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await api.transitionCase(caseItem.id, "REOPENED", "Case reopened following community dispute");
+                        loadData();
+                      }}
+                      className="btn btn-outline btn-sm"
+                    >
+                      Reopen Case
+                    </button>
+                  </>
+                )}
+
+                {(user.role === "REVIEWER" || user.role === "ADMINISTRATOR") && caseItem.state === "RESOLVED" && (
+                  <button
+                    onClick={async () => {
+                      await api.transitionCase(caseItem.id, "REOPENED", "Reviewer reopening case due to renewed community reports");
+                      loadData();
+                    }}
+                    className="btn btn-outline btn-sm"
+                  >
+                    Reopen Case
+                  </button>
+                )}
+
+                {(user.role === "OPERATOR" || user.role === "ADMINISTRATOR") && caseItem.state === "ASSIGNED" && (
+                  <button
+                    onClick={async () => {
+                      await api.transitionCase(caseItem.id, "IN_PROGRESS", "Field repair operations underway");
+                      loadData();
+                    }}
+                    className="btn btn-primary btn-sm"
+                  >
+                    Start Work (In Progress)
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Metadata Grid */}
           <div style={{

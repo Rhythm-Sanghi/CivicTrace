@@ -151,13 +151,18 @@ class ExportService:
         try:
             with zipfile.ZipFile(zip_path, "r") as zf:
                 file_list = zf.namelist()
-                if "manifest.json" not in file_list:
-                    return False, ["Invalid package: manifest.json is missing"]
+                # Security: Zip Slip / Path Traversal Guard
+                for member in file_list:
+                    if ".." in member or member.startswith("/") or member.startswith("\\"):
+                        return False, [f"SECURITY VULNERABILITY: Malicious path traversal detected in member name '{member}'"]
 
                 manifest_data = json.loads(zf.read("manifest.json").decode("utf-8"))
                 expected_files = manifest_data.get("files", {})
 
                 for fname, meta in expected_files.items():
+                    if ".." in fname or fname.startswith("/") or fname.startswith("\\"):
+                        return False, [f"SECURITY VULNERABILITY: Malicious path traversal declared in manifest entry '{fname}'"]
+
                     if fname not in file_list:
                         logs.append(f"MISSING: Declared file {fname} not found in package")
                         return False, logs

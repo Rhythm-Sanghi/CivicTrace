@@ -68,38 +68,66 @@ CivicTrace Web Interface will be live at: **`http://localhost:5173`**
 
 ---
 
+### 3. Database Migrations (Alembic)
+
+CivicTrace uses Alembic for declarative schema versioning and PostgreSQL / PostGIS portability:
+
+```bash
+cd services/api
+alembic upgrade head
+```
+
+---
+
 ## 👥 Seeded Demonstration Accounts
 
 The database comes pre-seeded with 5 interconnected scenarios set in **Indore Central & North Ward, Madhya Pradesh, India** (illustrative municipal data):
 
 | Role | Email | Password | Access / Purpose |
 | :--- | :--- | :--- | :--- |
-| **Community Reviewer** | `reviewer@civictrace.local` | `ReviewerPass2026!` | Duplicate correlation desk & case consolidation |
+| **Community Reviewer** | `reviewer@civictrace.local` | `ReviewerPass2026!` | Duplicate correlation desk, review overrides & case consolidation |
 | **Public Works Operator** | `lighting.operator@civictrace.local` | `OperatorPass2026!` | Logging repairs and submitting completion claims |
 | **Citizen Observer** | `citizen.aarav@civictrace.local` | `CitizenPass2026!` | Reporting defects & submitting resolution verifications |
 | **Administrator** | `admin@civictrace.local` | `AdminPass2026!` | System configuration & service area oversight |
 
-*Note: The sign-in page features one-click demo credentials for quick inspection.*
+*Note: In development and local-demo modes, the sign-in page features one-click demo credentials. In production environments (`ENVIRONMENT=production`), demo account exposure is strictly disabled and missing secret keys cause safe startup termination.*
 
 ---
 
 ## 🧪 Running Automated Tests
 
-Run the full backend and end-to-end integration test suite:
+### Backend Unit & Safeguard Suite (Pytest)
+Run the full backend security and cryptographic ledger test suite:
 
 ```bash
 cd services/api
 python -m pytest app/tests/ -v
 ```
 
-Tests include:
-- Append-only SHA-256 hash chain verification
-- Direct database row tamper detection
-- Deterministic Haversine distance calculations
-- Role-based conflict-of-interest guards (blocking operators from self-verifying)
-- Full lifecycle E2E test (Submission → Verification → Repair Claim → Citizen Dispute → ZIP Export Tamper Check)
+**9/9 tests pass**, covering:
+1. Append-only SHA-256 hash chain verification and mathematical tamper detection
+2. Deterministic Haversine spatial correlation and priority calculation
+3. Conflict of interest enforcement: operators strictly blocked from self-verifying resolution claims (`403 Forbidden`)
+4. Verification quorum and identity deduplication: requires 2 independent citizen confirmations to auto-resolve uncontested cases
+5. Contradictory dispute protection: any citizen dispute (`STILL_UNRESOLVED`) immediately forces case state into `DISPUTED`
+6. Unauthorized state transition prevention
+7. Full lifecycle end-to-end integration flow
+8. ZIP export evidence manifest hashing and Zip-Slip traversal protection
 
-To verify an exported evidence package via CLI:
+### Frontend Component Tests (Vitest)
+```bash
+cd apps/web
+npm run test
+```
+**2/2 tests pass** (UI layout, status badges, and button interactions).
+
+### End-to-End Browser Automation & Screenshot Capture (Playwright)
+```bash
+python scripts/run_browser_e2e.py
+```
+Executes genuine headless browser workflows against the running application and captures full UI screenshots into `docs/screenshots/`.
+
+To independently verify an exported evidence package via CLI:
 ```bash
 python scripts/verify_evidence.py storage/exports/<package_name>.zip
 ```

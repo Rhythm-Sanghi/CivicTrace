@@ -51,8 +51,11 @@ test-results/
 *.db
 storage/uploads/
 storage/exports/
+services/api/storage/uploads/
+services/api/storage/exports/
 !storage/uploads/.gitkeep
 !storage/exports/.gitkeep
+!services/api/storage/**/.gitkeep
 
 # Environment & Secrets
 .env

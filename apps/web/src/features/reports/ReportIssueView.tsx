@@ -13,6 +13,7 @@ export const ReportIssueView: React.FC = () => {
   const [longitude, setLongitude] = useState<number>(75.8577);
   const [addressRef, setAddressRef] = useState<string>("");
   const [pseudonym, setPseudonym] = useState<string>("");
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -54,6 +55,15 @@ export const ReportIssueView: React.FC = () => {
         address_reference: addressRef,
         guest_pseudonym: pseudonym || undefined,
       });
+
+      // If citizen selected an evidence file, upload it immediately attached to this report
+      if (evidenceFile) {
+        try {
+          await api.uploadEvidence(res.id, evidenceFile, "Initial observation photo evidence");
+        } catch (uploadErr: any) {
+          console.warn("Evidence attachment error:", uploadErr.message);
+        }
+      }
 
       setSuccessResult(res);
       setLoading(false);
@@ -263,6 +273,28 @@ export const ReportIssueView: React.FC = () => {
                   }}
                 />
               </div>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                Attach Photo or Document Evidence (Optional)
+              </label>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                onChange={(e) => setEvidenceFile(e.target.files ? e.target.files[0] : null)}
+                style={{
+                  width: "100%",
+                  padding: "8px 10px",
+                  fontSize: "13px",
+                  border: "1px dashed var(--color-border-strong)",
+                  borderRadius: "var(--radius-sm)",
+                  backgroundColor: "var(--color-surface-elevated)",
+                }}
+              />
+              <span style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px", display: "block" }}>
+                Supported formats: JPG, PNG, WEBP, PDF (Max 10MB). SHA-256 digest is generated automatically upon receipt.
+              </span>
             </div>
 
             <div>

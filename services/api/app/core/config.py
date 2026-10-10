@@ -1,5 +1,5 @@
 from typing import List, Union
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import json
 import os
@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     
     CORS_ORIGINS: Union[List[str], str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+    # Resolution Verification Policy Constants
+    # Minimum required confirmations from distinct identities to automatically resolve an uncontested claim
+    CONFIRMATIONS_REQUIRED_FOR_AUTO_RESOLVE: int = 2
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
@@ -41,5 +45,11 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
+
+# Production Security Gate: Fail safely if insecure default secret is used in production
+if settings.ENVIRONMENT.lower() == "production":
+    if settings.SECRET_KEY == "civictrace-insecure-development-secret-change-in-production-2026":
+        raise RuntimeError("FATAL: Cannot start CivicTrace in production with default insecure SECRET_KEY.")
+
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 os.makedirs(settings.EXPORT_DIR, exist_ok=True)

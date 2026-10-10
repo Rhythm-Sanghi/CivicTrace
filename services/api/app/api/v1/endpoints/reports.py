@@ -1,9 +1,13 @@
+import os
+import hashlib
 from typing import List, Optional
 import random
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.db.session import get_db
+from app.core.config import settings
 from app.models.entities import (
     Report,
     Case,
@@ -13,6 +17,7 @@ from app.models.entities import (
     ReportModerationStatus,
     CaseState,
     DuplicateCandidate,
+    EvidenceAsset,
 )
 from app.schemas.all_schemas import (
     ReportCreate,
@@ -20,6 +25,7 @@ from app.schemas.all_schemas import (
     CategoryPublic,
     DuplicateCandidatePublic,
     DuplicateDecision,
+    EvidenceAssetPublic,
 )
 from app.api.deps import get_current_user_optional, get_current_user, require_roles
 from app.services.duplicate_engine import DuplicateDetectionEngine
@@ -243,3 +249,94 @@ def decide_duplicate(
     db.commit()
     db.refresh(candidate)
     return candidate
+
+ALLOWED_EVIDENCE_MIME_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "application/pdf": ".pdf",
+}
+
+@router.post("/{report_id}/evidence", response_model=EvidenceAssetPublic, status_code=status.HTTP_201_CREATED)
+async def upload_report_evidence(
+    report_id: str,
+    file: UploadFile = File(...),
+    caption: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    report = db.query(Report).filter((Report.id == report_id) | (Report.public_id == report_id)).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    # 1. MIME type validation
+    if file.content_type not in ALLOWED_EVIDENCE_MIME_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported file format '{file.content_type}'. Allowed types: JPG, PNG, WEBP, PDF."
+        )
+
+    # 2. Read and size validation (max 10MB)
+    content = await file.read()
+    if len(content) > settings.MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File exceeds maximum allowed upload size of {settings.MAX_UPLOAD_SIZE_BYTES // (1024*1024)}MB."
+        )
+
+    # 3. Compute SHA-256 digest
+    sha256_hash = hashlib.sha256(content).hexdigest()
+
+    # 4. Save file safely with extension mapping to prevent executable execution
+    ext = ALLOWED_EVIDENCE_MIME_TYPES[file.content_type]
+    safe_filename = f"evid_{report.public_id}_{sha256_hash[:16]}{ext}"
+    saved_path = os.path.join(settings.UPLOAD_DIR, safe_filename)
+
+    with open(saved_path, "wb") as f:
+        f.write(content)
+
+    # 5. Record asset in database
+    asset = EvidenceAsset(
+        report_id=report.id,
+        case_id=report.case_id,
+        file_name=file.filename or safe_filename,
+        file_path=saved_path,
+        file_size=len(content),
+        mime_type=file.content_type,
+        sha256_hash=sha256_hash,
+        caption=caption,
+        is_public=True,
+    )
+    db.add(asset)
+
+    # If linked to a case, record on append-only cryptographic ledger
+    if report.case:
+        LedgerService.append_event(
+            db=db,
+            case=report.case,
+            event_type="EVIDENCE_ADDED",
+            payload={
+                "report_id": report.public_id,
+                "file_name": asset.file_name,
+                "sha256": asset.sha256_hash,
+                "size_bytes": asset.file_size,
+                "caption": caption,
+            },
+            actor=current_user,
+            public_actor_label="Citizen Observer" if not current_user else current_user.display_name,
+        )
+
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+@router.get("/evidence/{asset_id}/download")
+def download_evidence_asset(asset_id: str, db: Session = Depends(get_db)):
+    asset = db.query(EvidenceAsset).filter(EvidenceAsset.id == asset_id).first()
+    if not asset or not os.path.exists(asset.file_path):
+        raise HTTPException(status_code=404, detail="Evidence asset not found on disk")
+    return FileResponse(
+        path=asset.file_path,
+        media_type=asset.mime_type,
+        filename=asset.file_name,
+    )

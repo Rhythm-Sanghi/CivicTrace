@@ -35,6 +35,7 @@ from app.services.state_machine import CaseStateMachine
 from app.services.ledger import LedgerService
 from app.services.priority_engine import PriorityEngine
 from app.services.export_service import ExportService
+from app.services.verification_policy import VerificationPolicyEngine
 
 router = APIRouter()
 
@@ -279,36 +280,35 @@ def submit_verification_observation(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    # Anti-abuse guard: department operator cannot act as independent verifier on this case
-    if current_user and current_user.role == UserRole.OPERATOR:
-        raise HTTPException(
-            status_code=403,
-            detail="Department operators cannot submit independent verification observations."
+    try:
+        target_state, event_type, actor_label = VerificationPolicyEngine.evaluate_verification_submission(
+            db=db,
+            case=case,
+            user=current_user,
+            outcome=verif_in.outcome,
+            notes=verif_in.notes,
+            guest_pseudonym=verif_in.guest_pseudonym,
         )
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
 
     is_dispute = verif_in.outcome in [VerificationOutcome.STILL_UNRESOLVED, VerificationOutcome.PARTIALLY_FIXED]
 
     observation = VerificationObservation(
         case_id=case.id,
         verifier_id=current_user.id if current_user else None,
-        guest_pseudonym=verif_in.guest_pseudonym or ("Citizen Observer" if not current_user else current_user.display_name),
+        guest_pseudonym=verif_in.guest_pseudonym or (actor_label if not current_user else None),
         outcome=verif_in.outcome,
         notes=verif_in.notes,
         is_dispute=is_dispute,
     )
     db.add(observation)
 
-    if is_dispute:
-        # Move case to DISPUTED
-        case.state = CaseState.DISPUTED
-        event_type = "RESOLUTION_DISPUTED"
-    elif verif_in.outcome == VerificationOutcome.CONFIRMED_FIXED:
-        # Independent citizen confirmed fixed! Mark as RESOLVED
-        case.state = CaseState.RESOLVED
+    case.state = target_state
+    if target_state == CaseState.RESOLVED and not case.resolved_at:
         case.resolved_at = datetime.now(timezone.utc)
-        event_type = "RESOLUTION_VERIFIED_AND_CLOSED"
-    else:
-        event_type = "VERIFICATION_OBSERVATION_SUBMITTED"
 
     LedgerService.append_event(
         db=db,
@@ -318,9 +318,10 @@ def submit_verification_observation(
             "outcome": verif_in.outcome.value,
             "notes": verif_in.notes,
             "is_dispute": is_dispute,
+            "resulting_case_state": target_state.value,
         },
         actor=current_user,
-        public_actor_label="Citizen Observer" if not current_user else current_user.display_name,
+        public_actor_label=actor_label,
     )
 
     db.commit()
