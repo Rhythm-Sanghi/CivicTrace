@@ -104,16 +104,20 @@ cd services/api
 python -m pytest app/tests/ -v
 ```
 
-**10/10 tests pass**, covering:
+**14/14 tests pass**, covering:
 1. Append-only SHA-256 hash chain verification and mathematical tamper detection
 2. Deterministic Haversine spatial correlation and priority calculation
 3. Conflict of interest enforcement: operators strictly blocked from self-verifying resolution claims (`403 Forbidden`)
-4. Verification quorum and identity deduplication: requires 2 independent citizen confirmations to auto-resolve uncontested cases
+4. Verification quorum and anti-sybil deduplication: requires 2 independent citizen confirmations to auto-resolve uncontested cases
 5. Contradictory dispute protection: any citizen dispute (`STILL_UNRESOLVED`) immediately forces case state into `DISPUTED`
-6. Unauthorized state transition prevention
-7. Full lifecycle end-to-end integration flow
-8. ZIP export evidence manifest hashing and Zip-Slip traversal protection
-9. Priority band engine mappings and critical hazard escalations
+6. Unauthorized state transition prevention via centralized `CaseStateMachine`
+7. Collision-resistant monotonic sequential public identifier allocators (`RPT-2026-XXXX`, `CAS-2026-XXXX`)
+8. In-memory sliding-window IP rate limiting on authentication and reporting endpoints
+9. Strict file magic bytes inspection (JPEG, PNG, WEBP, PDF) and 10MB streaming size validation
+10. Full lifecycle end-to-end integration flow
+11. ZIP export evidence manifest hashing and Zip-Slip traversal protection
+12. Duplicate zip entry rejection preventing archive ambiguity attacks
+13. Priority band engine mappings and critical hazard escalations
 
 ### Frontend Component Tests (Vitest)
 ```bash
