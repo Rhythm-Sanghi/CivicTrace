@@ -55,3 +55,4 @@ target-version = "py311"
 [tool.pytest.ini_options]
 testpaths = ["app/tests"]
 python_files = ["test_*.py"]
+pythonpath = ["."]

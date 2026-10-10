@@ -3,11 +3,12 @@ import hashlib
 from typing import List, Optional
 import random
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.config import settings
+from app.core.rate_limiter import check_rate_limit
 from app.models.entities import (
     Report,
     Case,
@@ -22,6 +23,7 @@ from app.models.entities import (
 from app.schemas.all_schemas import (
     ReportCreate,
     ReportPublic,
+    ReportModerationRequest,
     CategoryPublic,
     DuplicateCandidatePublic,
     DuplicateDecision,
@@ -34,6 +36,26 @@ from app.services.ledger import LedgerService
 
 router = APIRouter()
 
+MAGIC_SIGNATURES = {
+    b"\xff\xd8\xff": "image/jpeg",
+    b"\x89PNG\r\n\x1a\n": "image/png",
+    b"RIFF": "image/webp", # WEBP starts with RIFF....WEBP
+    b"%PDF-": "application/pdf",
+}
+
+def validate_magic_bytes(content: bytes, declared_mime: str) -> bool:
+    if len(content) < 8:
+        return False
+    if declared_mime == "image/jpeg" and content.startswith(b"\xff\xd8\xff"):
+        return True
+    if declared_mime == "image/png" and content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return True
+    if declared_mime == "image/webp" and content.startswith(b"RIFF") and b"WEBP" in content[:16]:
+        return True
+    if declared_mime == "application/pdf" and content.startswith(b"%PDF-"):
+        return True
+    return False
+
 @router.get("/categories", response_model=List[CategoryPublic])
 def list_categories(db: Session = Depends(get_db)):
     return db.query(IssueCategory).all()
@@ -41,9 +63,13 @@ def list_categories(db: Session = Depends(get_db)):
 @router.post("", response_model=ReportPublic, status_code=status.HTTP_201_CREATED)
 def submit_report(
     report_in: ReportCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
+    # Enforce submission rate limiting
+    check_rate_limit(request, max_requests=30, window_seconds=60, action_key="submit_report")
+
     category = db.query(IssueCategory).filter(IssueCategory.id == report_in.category_id).first()
     if not category:
         raise HTTPException(status_code=400, detail="Invalid category ID")
@@ -51,6 +77,12 @@ def submit_report(
     # Generate public reference ID: e.g. RPT-2026-XXXX
     count = db.query(Report).count() + 1
     public_id = f"RPT-2026-{count:04d}"
+
+    # Moderation Policy:
+    # Authenticated Reviewer or Administrator reports are pre-approved.
+    # Authenticated Citizen or Guest reports are approved by default for the demo,
+    # but marked explicitly with their verified user identity or guest pseudonym.
+    initial_moderation = ReportModerationStatus.APPROVED
 
     report = Report(
         public_id=public_id,
@@ -63,7 +95,7 @@ def submit_report(
         longitude=report_in.longitude,
         address_reference=report_in.address_reference,
         accuracy_meters=report_in.accuracy_meters,
-        moderation_status=ReportModerationStatus.APPROVED, # Default to approved unless flagged
+        moderation_status=initial_moderation,
     )
     db.add(report)
     db.flush()
@@ -143,6 +175,62 @@ def list_my_reports(
     current_user: User = Depends(get_current_user),
 ):
     return db.query(Report).filter(Report.reporter_id == current_user.id).order_by(Report.created_at.desc()).all()
+
+@router.post("/{report_id}/moderate", response_model=ReportPublic)
+def moderate_report(
+    report_id: str,
+    mod_in: ReportModerationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.REVIEWER, UserRole.ADMINISTRATOR)),
+):
+    report = db.query(Report).filter((Report.id == report_id) | (Report.public_id == report_id)).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    report.moderation_status = mod_in.decision
+    if mod_in.notes:
+        report.moderation_notes = mod_in.notes
+
+    # If approved and not yet linked to any case, check if it should create or link to case
+    if mod_in.decision == ReportModerationStatus.APPROVED and not report.case_id:
+        case_count = db.query(Case).count() + 1
+        case_public_id = f"CAS-2026-{case_count:04d}"
+
+        score, band, breakdown = PriorityEngine.calculate_priority(
+            category_weight=report.category.default_severity_weight,
+            report_count=1,
+            created_at=datetime.now(timezone.utc),
+        )
+
+        new_case = Case(
+            public_id=case_public_id,
+            category_id=report.category_id,
+            title=report.title,
+            description=report.description,
+            latitude=report.latitude,
+            longitude=report.longitude,
+            address_reference=report.address_reference,
+            state=CaseState.SUBMITTED,
+            priority_score=score,
+            priority_band=band,
+            priority_breakdown=breakdown,
+        )
+        db.add(new_case)
+        db.flush()
+        report.case_id = new_case.id
+
+        LedgerService.append_event(
+            db=db,
+            case=new_case,
+            event_type="REPORT_APPROVED_AND_CASE_OPENED",
+            payload={"report_id": report.public_id, "reviewer": current_user.display_name, "notes": mod_in.notes},
+            actor=current_user,
+            public_actor_label="Community Reviewer",
+        )
+
+    db.commit()
+    db.refresh(report)
+    return report
 
 @router.get("/duplicates/pending", response_model=List[DuplicateCandidatePublic])
 def list_pending_duplicates(
@@ -269,6 +357,23 @@ async def upload_report_evidence(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
+    # Authorization Check:
+    # Evidence may only be attached by:
+    # 1. The original reporting user (if authenticated report)
+    # 2. An authorized reviewer or administrator
+    # 3. An anonymous reporter attaching evidence to an unassigned guest report
+    if report.reporter_id:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required to attach evidence to this report.",
+            )
+        if current_user.id != report.reporter_id and current_user.role not in [UserRole.REVIEWER, UserRole.ADMINISTRATOR]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not authorized to upload evidence to another citizen's report.",
+            )
+
     # 1. MIME type validation
     if file.content_type not in ALLOWED_EVIDENCE_MIME_TYPES:
         raise HTTPException(
@@ -276,18 +381,35 @@ async def upload_report_evidence(
             detail=f"Unsupported file format '{file.content_type}'. Allowed types: JPG, PNG, WEBP, PDF."
         )
 
-    # 2. Read and size validation (max 10MB)
-    content = await file.read()
-    if len(content) > settings.MAX_UPLOAD_SIZE_BYTES:
+    # 2. Stream-read with strict size cap (max 10MB) to prevent memory exhaustion
+    chunk_size = 64 * 1024 # 64KB chunks
+    total_size = 0
+    chunks = []
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > settings.MAX_UPLOAD_SIZE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File exceeds maximum allowed upload size of {settings.MAX_UPLOAD_SIZE_BYTES // (1024*1024)}MB."
+            )
+        chunks.append(chunk)
+
+    content = b"".join(chunks)
+
+    # 3. Magic bytes inspection to prevent extension/MIME spoofing
+    if not validate_magic_bytes(content, file.content_type):
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds maximum allowed upload size of {settings.MAX_UPLOAD_SIZE_BYTES // (1024*1024)}MB."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File content does not match declared media type '{file.content_type}'. Upload rejected.",
         )
 
-    # 3. Compute SHA-256 digest
+    # 4. Compute SHA-256 digest
     sha256_hash = hashlib.sha256(content).hexdigest()
 
-    # 4. Save file safely with extension mapping to prevent executable execution
+    # 5. Save file safely with extension mapping to prevent arbitrary file execution
     ext = ALLOWED_EVIDENCE_MIME_TYPES[file.content_type]
     safe_filename = f"evid_{report.public_id}_{sha256_hash[:16]}{ext}"
     saved_path = os.path.join(settings.UPLOAD_DIR, safe_filename)
@@ -295,7 +417,7 @@ async def upload_report_evidence(
     with open(saved_path, "wb") as f:
         f.write(content)
 
-    # 5. Record asset in database
+    # 6. Record asset in database
     asset = EvidenceAsset(
         report_id=report.id,
         case_id=report.case_id,
@@ -331,10 +453,23 @@ async def upload_report_evidence(
     return asset
 
 @router.get("/evidence/{asset_id}/download")
-def download_evidence_asset(asset_id: str, db: Session = Depends(get_db)):
+def download_evidence_asset(
+    asset_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
     asset = db.query(EvidenceAsset).filter(EvidenceAsset.id == asset_id).first()
     if not asset or not os.path.exists(asset.file_path):
         raise HTTPException(status_code=404, detail="Evidence asset not found on disk")
+
+    # Access control: If asset is not marked public, caller must be owner or reviewer/admin
+    if not asset.is_public:
+        if not current_user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required to view non-public asset.")
+        if current_user.role not in [UserRole.REVIEWER, UserRole.ADMINISTRATOR]:
+            if asset.report and asset.report.reporter_id != current_user.id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
     return FileResponse(
         path=asset.file_path,
         media_type=asset.mime_type,

@@ -88,6 +88,10 @@ class ReportPublic(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class ReportModerationRequest(BaseModel):
+    decision: ReportModerationStatus
+    notes: Optional[str] = None
+
 # Case schemas
 class CasePublic(BaseModel):
     id: str
