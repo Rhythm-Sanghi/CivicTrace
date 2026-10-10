@@ -5,8 +5,8 @@ import { MemoryRouter } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { LoginView } from "../features/auth/LoginView";
 
-describe("Frontend Core Components & Design System", () => {
-  it("renders AppShell brand and primary navigation items", () => {
+describe("Frontend Core Components & Benchlight Design System", () => {
+  it("renders AppShell brand, numbered navigation, and offline status footer", () => {
     render(
       <MemoryRouter>
         <AppShell>
@@ -16,11 +16,15 @@ describe("Frontend Core Components & Design System", () => {
     );
 
     expect(screen.getByText("CivicTrace")).toBeInTheDocument();
-    expect(screen.getByText("Field Ledger Standard")).toBeInTheDocument();
+    expect(screen.getByText("01")).toBeInTheDocument();
     expect(screen.getByText("Overview")).toBeInTheDocument();
-    expect(screen.getByText("Case Explorer")).toBeInTheDocument();
+    expect(screen.getByText("02")).toBeInTheDocument();
+    expect(screen.getByText("Cases")).toBeInTheDocument();
+    expect(screen.getByText("03")).toBeInTheDocument();
     expect(screen.getByText("Intelligence")).toBeInTheDocument();
-    expect(screen.getByText("Report Issue")).toBeInTheDocument();
+    expect(screen.getByText("04")).toBeInTheDocument();
+    expect(screen.getByText("Report issue")).toBeInTheDocument();
+    expect(screen.getByText("Local · Offline")).toBeInTheDocument();
     expect(screen.getByText("Child workspace")).toBeInTheDocument();
   });
 
@@ -32,9 +36,10 @@ describe("Frontend Core Components & Design System", () => {
     );
 
     expect(screen.getByText("CivicTrace Portal Sign-In")).toBeInTheDocument();
-    expect(screen.getByText(/Community Reviewer:/)).toBeInTheDocument();
-    expect(screen.getByText(/Public Works Operator:/)).toBeInTheDocument();
-    expect(screen.getByText(/Citizen Observer:/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Sign In/i })).toBeInTheDocument();
+    expect(screen.getByText("Citizen (Aarav)")).toBeInTheDocument();
+    expect(screen.getByText("Reviewer (Rajesh)")).toBeInTheDocument();
+    expect(screen.getByText("Operator (Kavita)")).toBeInTheDocument();
+    expect(screen.getByText("Administrator")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sign In to Portal/i })).toBeInTheDocument();
   });
 });

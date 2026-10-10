@@ -1,18 +1,20 @@
 import React, { useState } from "react";
-import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { getCurrentUser, clearAuthToken, type User } from "../lib/api";
-import {
-  TrendingUp,
-  PlusCircle,
-  Shield,
-  Layers,
-  Wrench,
-  LogOut,
-  LogIn,
-  Database,
-  ChevronRight,
-  Activity
-} from "lucide-react";
+
+function CivicBeacon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 32 32" width="22" height="22">
+      <path
+        d="M6 9l10-5 10 5v9c0 6-10 11-10 11S6 23 6 18V9z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path d="M16 8v14M11 15h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -20,7 +22,6 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [user, setUser] = useState<User | null>(getCurrentUser());
 
   const handleLogout = () => {
@@ -29,163 +30,96 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     navigate("/");
   };
 
-  // Determine current section for utility header breadcrumb
-  const getSectionTitle = () => {
-    const path = location.pathname;
-    if (path === "/") return "Overview & Community Investigation";
-    if (path.startsWith("/explorer")) return "Public Cases Explorer";
-    if (path.startsWith("/cases")) return "Forensic Case Dossier";
-    if (path.startsWith("/neighborhood")) return "Neighborhood Telemetry & Scorecards";
-    if (path.startsWith("/report")) return "Civic Intake Portal";
-    if (path.startsWith("/reviewer")) return "Community Reviewer Desk";
-    if (path.startsWith("/operator")) return "Public Works Dispatch Terminal";
-    if (path.startsWith("/login")) return "Access & Authentication Gate";
-    return "Public Investigation Workspace";
-  };
+  const navItems = [
+    { index: "01", name: "Overview", path: "/" },
+    { index: "02", name: "Cases", path: "/explorer" },
+    { index: "03", name: "Intelligence", path: "/neighborhood" },
+    { index: "04", name: "Report issue", path: "/report" },
+  ];
+
+  if (user && (user.role === "REVIEWER" || user.role === "ADMINISTRATOR")) {
+    navItems.push({
+      index: String(navItems.length + 1).padStart(2, "0"),
+      name: "Reviewer desk",
+      path: "/reviewer",
+    });
+  }
+  if (user && (user.role === "OPERATOR" || user.role === "ADMINISTRATOR")) {
+    navItems.push({
+      index: String(navItems.length + 1).padStart(2, "0"),
+      name: "Operator terminal",
+      path: "/operator",
+    });
+  }
 
   return (
-    <div className="field-shell">
-      {/* 1. DARK-INK INDUSTRIAL NAVIGATION RAIL */}
-      <aside className="nav-rail">
-        {/* Brand Header */}
-        <div className="nav-rail-header">
-          <Link to="/" className="nav-rail-brand">
-            <div className="nav-rail-logo">CT</div>
-            <div>
-              <div className="nav-rail-title">CivicTrace</div>
-              <div className="nav-rail-subtitle">Field Ledger Standard</div>
-            </div>
-          </Link>
-        </div>
+    <div className="application">
+      <a className="skip-link" href="#main-workspace">
+        Skip to workspace
+      </a>
 
-        {/* Primary Navigation Routes */}
-        <div className="nav-rail-group">
-          <div className="nav-rail-label">Public Investigation</div>
-          
-          <NavLink to="/" end className={({ isActive }) => `nav-rail-link ${isActive ? "active" : ""}`}>
-            <Activity size={15} />
-            <span>Overview</span>
-          </NavLink>
+      {/* Benchlight Light Sidebar */}
+      <aside className="app-sidebar">
+        <Link to="/" className="brand">
+          <CivicBeacon />
+          <strong>CivicTrace</strong>
+        </Link>
 
-          <NavLink to="/explorer" className={({ isActive }) => `nav-rail-link ${isActive ? "active" : ""}`}>
-            <Database size={15} />
-            <span>Case Explorer</span>
-            <span className="nav-rail-badge">Indore</span>
-          </NavLink>
+        <nav aria-label="Main navigation">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === "/"}
+              className={({ isActive }) => (isActive ? "active" : "")}
+            >
+              <span className="nav-index" aria-hidden="true">
+                {item.index}
+              </span>
+              <span>{item.name}</span>
+            </NavLink>
+          ))}
+        </nav>
 
-          <NavLink to="/neighborhood" className={({ isActive }) => `nav-rail-link ${isActive ? "active" : ""}`}>
-            <TrendingUp size={15} />
-            <span>Intelligence</span>
-          </NavLink>
-        </div>
-
-        {/* Citizen Intake Action */}
-        <div className="nav-rail-group" style={{ paddingTop: "6px" }}>
-          <div className="nav-rail-label">Citizen Intake</div>
-          <NavLink to="/report" className={({ isActive }) => `nav-rail-link ${isActive ? "active" : ""}`} style={{ color: "var(--color-ink-rail-text)" }}>
-            <PlusCircle size={15} color="#9BC0D6" />
-            <span>Report Issue</span>
-          </NavLink>
-        </div>
-
-        {/* Role-Specific Workspaces (Contextual) */}
-        {user && (user.role === "REVIEWER" || user.role === "OPERATOR" || user.role === "ADMINISTRATOR") && (
-          <div className="nav-rail-group" style={{ paddingTop: "6px" }}>
-            <div className="nav-rail-label">Operational Desks</div>
-
-            {(user.role === "REVIEWER" || user.role === "ADMINISTRATOR") && (
-              <NavLink to="/reviewer" className={({ isActive }) => `nav-rail-link ${isActive ? "active" : ""}`}>
-                <Layers size={15} />
-                <span>Reviewer Desk</span>
-              </NavLink>
-            )}
-
-            {(user.role === "OPERATOR" || user.role === "ADMINISTRATOR") && (
-              <NavLink to="/operator" className={({ isActive }) => `nav-rail-link ${isActive ? "active" : ""}`}>
-                <Wrench size={15} />
-                <span>Operator Terminal</span>
-              </NavLink>
-            )}
-          </div>
-        )}
-
-        {/* Account & Session Control Footer */}
-        <div className="nav-rail-footer">
-          {user ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
-                <Shield size={14} color="var(--color-civic-blue)" style={{ flexShrink: 0 }} />
-                <div style={{ overflow: "hidden" }}>
-                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#FFF", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
-                    {user.display_name}
-                  </div>
-                  <div style={{ fontSize: "10px", fontFamily: "var(--font-family-mono)", color: "var(--color-ink-rail-muted)" }}>
-                    {user.role}
-                  </div>
-                </div>
-              </div>
-
+        {/* Local Workspace Note / Status */}
+        <div className="local-note">
+          <span className="local-marker" aria-hidden="true" />
+          {user ? user.display_name : "Local workspace"}
+          <p>
+            {user ? `${user.role} session active` : "Indore Ward 34 · Offline ledger"}
+            <br />
+            {user ? (
               <button
                 onClick={handleLogout}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--color-ink-rail-muted)",
-                  cursor: "pointer",
-                  padding: "4px",
-                }}
-                title="Sign out"
+                className="button-quiet"
+                style={{ padding: 0, fontSize: "11px", color: "var(--accent)", cursor: "pointer" }}
               >
-                <LogOut size={14} />
+                Sign out
               </button>
-            </div>
-          ) : (
-            <Link
-              to="/login"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                color: "var(--color-ink-rail-text)",
-                textDecoration: "none",
-                fontSize: "12px",
-                fontWeight: 500,
-                width: "100%",
-                justifyContent: "center",
-                padding: "4px 0",
-              }}
-            >
-              <LogIn size={14} /> Sign In to Portal
-            </Link>
-          )}
+            ) : (
+              <Link to="/login" style={{ fontSize: "11px", color: "var(--accent)" }}>
+                Sign in to portal
+              </Link>
+            )}
+          </p>
         </div>
       </aside>
 
-      {/* 2. MAIN WORKING CANVAS */}
-      <div className="field-canvas">
-        {/* Slim Utility Header */}
-        <header className="utility-header">
-          <div className="utility-breadcrumb">
-            <span style={{ color: "var(--color-text-muted)" }}>CIVICTRACE</span>
-            <ChevronRight size={12} color="var(--color-text-muted)" />
-            <span style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{getSectionTitle()}</span>
-          </div>
+      {/* Main Viewport */}
+      <main className="main-viewport" id="main-workspace" tabIndex={-1}>
+        {children}
+      </main>
 
-          <div className="utility-telemetry">
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span className="pulse-indicator" />
-              <span>SHA-256 LEDGER LIVE</span>
-            </div>
-            <span style={{ color: "var(--color-border-strong)" }}>|</span>
-            <span>WARD 34 &bull; INDORE</span>
-          </div>
-        </header>
-
-        {/* Fluid Content Canvas */}
-        <main className="field-content">
-          {children}
-        </main>
-      </div>
+      {/* Benchlight Application Status Bar */}
+      <footer className="app-status-bar">
+        <span className="status-context">Local · Offline</span>
+        <span role="status">
+          SHA-256 Ledger Verified Intact · Indore Ward 34
+        </span>
+        <span className="status-version">
+          v1.0.0
+        </span>
+      </footer>
     </div>
   );
 };

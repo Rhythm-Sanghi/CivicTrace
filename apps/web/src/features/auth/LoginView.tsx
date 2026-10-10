@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
-import { SectionHeader } from "../../components/FieldPrimitives";
-import { LogIn, Key, Shield } from "lucide-react";
+import { PageHeading, SectionHeader } from "../../components/FieldPrimitives";
 
 export const LoginView: React.FC = () => {
   const navigate = useNavigate();
@@ -31,143 +30,97 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: "520px", margin: "40px auto" }}>
-      <div style={{
-        backgroundColor: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        borderRadius: "var(--radius-sm)",
-        overflow: "hidden",
-        marginBottom: "20px",
-      }}>
-        <SectionHeader title="CivicTrace Portal Sign-In" />
+    <>
+      <PageHeading
+        index="00"
+        title="Portal Sign-In"
+        description="Authenticate with civic credentials or use demo identity keys. CivicTrace Portal Sign-In."
+      />
 
-        <div style={{ padding: "24px" }}>
-          {errorMsg && (
-            <div style={{
-              padding: "10px 14px",
-              backgroundColor: "var(--color-disputed-red-subtle)",
-              color: "var(--color-disputed-red)",
-              borderRadius: "var(--radius-sm)",
-              fontSize: "13px",
-              marginBottom: "16px",
-            }}>
-              {errorMsg}
+      <div className="workspace">
+        <div style={{ maxWidth: "480px", margin: "20px auto" }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "var(--space-5)" }}>
+            <SectionHeader index="01" title="CivicTrace Portal Sign-In" />
+
+            {errorMsg && (
+              <div role="alert" style={{ marginBottom: "var(--space-3)" }}>
+                {errorMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} style={{ margin: "var(--space-3) 0" }}>
+              <div style={{ marginBottom: "var(--space-3)" }}>
+                <label htmlFor="login-email">Email Address</label>
+                <input
+                  id="login-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  style={{ width: "100%" }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "var(--space-4)" }}>
+                <label htmlFor="login-password">Password</label>
+                <input
+                  id="login-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  style={{ width: "100%" }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="button-primary"
+                style={{ width: "100%", justifyContent: "center" }}
+              >
+                {loading ? "Authenticating..." : "Sign In to Portal"}
+              </button>
+            </form>
+
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-4)" }}>
+              <span className="muted" style={{ fontSize: "11px", display: "block", marginBottom: "var(--space-2)" }}>
+                One-Click Seed Accounts:
+              </span>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
+                <button
+                  type="button"
+                  onClick={() => handleQuickDemoFill("citizen.aarav@civictrace.local", "CitizenPass2026!")}
+                  className="btn-outline btn-sm"
+                >
+                  Citizen (Aarav)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickDemoFill("reviewer@civictrace.local", "ReviewerPass2026!")}
+                  className="btn-outline btn-sm"
+                >
+                  Reviewer (Rajesh)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickDemoFill("lighting.operator@civictrace.local", "OperatorPass2026!")}
+                  className="btn-outline btn-sm"
+                >
+                  Operator (Kavita)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickDemoFill("admin@civictrace.local", "AdminPass2026!")}
+                  className="btn-outline btn-sm"
+                >
+                  Administrator
+                </button>
+              </div>
             </div>
-          )}
-
-          <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                style={{
-                  width: "100%",
-                  padding: "8px 10px",
-                  fontSize: "13px",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--radius-sm)",
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                style={{
-                  width: "100%",
-                  padding: "8px 10px",
-                  fontSize: "13px",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--radius-sm)",
-                }}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn btn-dark"
-              style={{ width: "100%", marginTop: "4px", padding: "8px 14px" }}
-            >
-              <LogIn size={14} /> {loading ? "Signing in..." : "Sign In to Field Ledger"}
-            </button>
-          </form>
+          </div>
         </div>
       </div>
-
-      {/* Quick Demo Accounts Selection Box */}
-      <div style={{
-        backgroundColor: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        borderRadius: "var(--radius-sm)",
-        overflow: "hidden",
-      }}>
-        <div style={{
-          padding: "10px 16px",
-          backgroundColor: "var(--color-surface-elevated)",
-          borderBottom: "1px solid var(--color-border)",
-          fontSize: "11px",
-          fontFamily: "var(--font-family-mono)",
-          fontWeight: 600,
-          color: "var(--color-text-secondary)",
-          textTransform: "uppercase",
-        }}>
-          Seeded Local Demo Roles (One-Click Selection):
-        </div>
-
-        <div style={{ padding: "14px", display: "flex", flexDirection: "column", gap: "8px" }}>
-          <button
-            type="button"
-            onClick={() => handleQuickDemoFill("reviewer@civictrace.local", "ReviewerPass2026!")}
-            className="btn btn-outline btn-sm"
-            style={{ justifyContent: "space-between", fontSize: "12px", padding: "8px 12px" }}
-          >
-            <span><strong>Community Reviewer:</strong> reviewer@civictrace.local</span>
-            <Key size={13} color="var(--color-civic-blue)" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickDemoFill("lighting.operator@civictrace.local", "OperatorPass2026!")}
-            className="btn btn-outline btn-sm"
-            style={{ justifyContent: "space-between", fontSize: "12px", padding: "8px 12px" }}
-          >
-            <span><strong>Public Works Operator:</strong> lighting.operator@civictrace.local</span>
-            <Key size={13} color="var(--color-attention-orange)" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickDemoFill("citizen.aarav@civictrace.local", "CitizenPass2026!")}
-            className="btn btn-outline btn-sm"
-            style={{ justifyContent: "space-between", fontSize: "12px", padding: "8px 12px" }}
-          >
-            <span><strong>Citizen Observer:</strong> citizen.aarav@civictrace.local</span>
-            <Key size={13} color="var(--color-verified-green)" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickDemoFill("admin@civictrace.local", "AdminPass2026!")}
-            className="btn btn-outline btn-sm"
-            style={{ justifyContent: "space-between", fontSize: "12px", padding: "8px 12px" }}
-          >
-            <span><strong>Administrator:</strong> admin@civictrace.local</span>
-            <Shield size={13} color="var(--color-civic-blue)" />
-          </button>
-        </div>
-      </div>
-    </div>
+    </>
   );
 };

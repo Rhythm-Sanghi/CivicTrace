@@ -1,31 +1,40 @@
 import React from "react";
 import { Link } from "react-router-dom";
 
-// 1. Page Heading Primitive
+// 1. Benchlight Page Header Primitive
 export interface PageHeadingProps {
-  eyebrow?: string;
+  index?: string;
+  eyebrow?: string; // fallback if index omitted
   title: string;
   description?: string;
   children?: React.ReactNode;
 }
 
 export const PageHeading: React.FC<PageHeadingProps> = ({
+  index = "01",
   eyebrow,
   title,
   description,
   children,
-}) => (
-  <div className="page-header">
-    <div>
-      {eyebrow && <div className="page-eyebrow">{eyebrow}</div>}
-      <h1 className="page-title">{title}</h1>
-      {description && <p className="page-description">{description}</p>}
-    </div>
-    {children && <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>{children}</div>}
-  </div>
-);
+}) => {
+  const displayIndex = index || (eyebrow ? eyebrow.slice(0, 2) : "01");
+  return (
+    <header className="page-header">
+      <div className="page-heading">
+        <span className="page-index" aria-hidden="true">
+          {displayIndex} /
+        </span>
+        <div>
+          <h1 id="page-title">{title}</h1>
+          {description && <p>{description}</p>}
+        </div>
+      </div>
+      {children && <div className="header-toolbar">{children}</div>}
+    </header>
+  );
+};
 
-// 2. Metric Strip Primitive
+// 2. Benchlight Flat Measurement / Metric Strip Primitive
 export interface MetricItem {
   label: string;
   value: string | number;
@@ -38,41 +47,44 @@ export interface MetricStripProps {
 }
 
 export const MetricStrip: React.FC<MetricStripProps> = ({ metrics }) => (
-  <div className="metric-strip">
+  <dl className="measurement" aria-label="Key civic metrics">
     {metrics.map((m, idx) => (
-      <div key={idx} className="metric-cell">
-        <div className="metric-cell-label" style={{ color: m.accentColor || undefined }}>
-          {m.label}
-        </div>
-        <div className="metric-cell-value" style={{ color: m.accentColor || "var(--color-text-primary)" }}>
-          {m.value}
-        </div>
-        {m.description && <div className="metric-cell-desc">{m.description}</div>}
+      <div key={idx}>
+        <dt>{m.label}</dt>
+        <dd style={{ color: m.accentColor || undefined }}>{m.value}</dd>
       </div>
     ))}
-  </div>
+  </dl>
 );
 
-// 3. Status Stamp Primitive
+// 3. Benchlight Status Mark Primitive (Restrained colored square + label)
 export interface StatusStampProps {
   state: string;
   size?: "sm" | "md";
 }
 
-export const StatusStamp: React.FC<StatusStampProps> = ({ state, size = "md" }) => {
+export const StatusStamp: React.FC<StatusStampProps> = ({ state }) => {
   const norm = state.toLowerCase();
+  let stateClass = "state-progress";
+  if (norm.includes("verified") || norm.includes("resolved")) {
+    stateClass = "state-verified";
+  } else if (norm.includes("disputed") || norm.includes("rejected")) {
+    stateClass = "state-disputed";
+  } else if (norm.includes("awaiting") || norm.includes("submitted") || norm.includes("claim")) {
+    stateClass = "state-awaiting";
+  }
+
   return (
-    <span
-      className={`archival-stamp stamp-${norm}`}
-      style={{ fontSize: size === "sm" ? "10px" : "11px" }}
-    >
-      {state.replace(/_/g, " ")}
+    <span className={`state-label ${stateClass}`}>
+      <span className="state-mark" aria-hidden="true" />
+      <span>{state.replace(/_/g, " ")}</span>
     </span>
   );
 };
 
-// 4. Dark-Ink Section Header Primitive
+// 4. Benchlight Section Heading Primitive
 export interface SectionHeaderProps {
+  index?: string;
   title: string;
   actionText?: string;
   actionHref?: string;
@@ -80,33 +92,24 @@ export interface SectionHeaderProps {
 }
 
 export const SectionHeader: React.FC<SectionHeaderProps> = ({
+  index,
   title,
   actionText,
   actionHref,
   children,
 }) => (
-  <div style={{
-    backgroundColor: "var(--color-ink-rail)",
-    color: "#FFF",
-    padding: "10px 16px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    fontSize: "11px",
-    fontFamily: "var(--font-family-mono)",
-    fontWeight: 600,
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    borderTopLeftRadius: "var(--radius-sm)",
-    borderTopRightRadius: "var(--radius-sm)",
-    borderBottom: "1px solid var(--color-ink-rail-border)",
-  }}>
-    <span>{title}</span>
-    {actionText && actionHref && (
-      <Link to={actionHref} style={{ color: "#9BC0D6", textDecoration: "none", fontSize: "11px" }}>
-        {actionText} &rarr;
-      </Link>
-    )}
-    {children}
+  <div className="section-heading">
+    <h2>
+      {index && <span className="section-index">{index}</span>}
+      {title}
+    </h2>
+    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+      {actionText && actionHref && (
+        <Link to={actionHref} className="section-detail">
+          {actionText}
+        </Link>
+      )}
+      {children}
+    </div>
   </div>
 );

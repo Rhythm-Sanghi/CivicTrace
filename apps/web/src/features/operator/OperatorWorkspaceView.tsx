@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { api, type Case } from "../../lib/api";
 import { PageHeading, SectionHeader, StatusStamp } from "../../components/FieldPrimitives";
-import { Wrench } from "lucide-react";
 
 export const OperatorWorkspaceView: React.FC = () => {
   const [assignedCases, setAssignedCases] = useState<Case[]>([]);
@@ -50,177 +49,124 @@ export const OperatorWorkspaceView: React.FC = () => {
   };
 
   return (
-    <div>
+    <>
       <PageHeading
-        eyebrow="PUBLIC WORKS OPERATOR TERMINAL &bull; INDORE DISPATCH"
-        title="Active Work Orders & Resolution Claims"
-        description="Log repair operations and file completion evidence. Claims remain in Awaiting Community Verification until verified by the public."
+        index="06"
+        title="Operator terminal"
+        description="Active Work Orders & Resolution Claims · Log repair operations and file completion evidence. Claims remain in Awaiting Community Verification until verified by the public."
       />
 
-      {statusMsg && (
-        <div style={{
-          padding: "10px 14px",
-          backgroundColor: statusMsg.includes("Error") ? "var(--color-disputed-red-subtle)" : "var(--color-verified-green-subtle)",
-          color: statusMsg.includes("Error") ? "var(--color-disputed-red)" : "var(--color-verified-green)",
-          borderRadius: "var(--radius-sm)",
-          fontSize: "13px",
-          marginBottom: "16px",
-        }}>
-          {statusMsg}
-        </div>
-      )}
-
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1.2fr) minmax(420px, 1.8fr)", gap: "20px" }}>
-        {/* Work Orders List */}
-        <div style={{
-          backgroundColor: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-sm)",
-          overflow: "hidden",
-        }}>
-          <SectionHeader title={`Work Order Queue (${assignedCases.length})`} />
-
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {assignedCases.map((c) => (
-              <div
-                key={c.id}
-                onClick={() => setSelectedCase(c)}
-                style={{
-                  padding: "12px 16px",
-                  borderBottom: "1px solid var(--color-border-subtle)",
-                  cursor: "pointer",
-                  backgroundColor: selectedCase?.id === c.id ? "var(--color-civic-blue-subtle)" : undefined,
-                  transition: "background-color 100ms",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                  <span className="mono-id">{c.public_id}</span>
-                  <StatusStamp state={c.state} size="sm" />
-                </div>
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: "2px" }}>
-                  {c.title}
-                </div>
-                <div style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
-                  📍 {c.address_reference}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Claim Action Station */}
-        {selectedCase ? (
-          <div style={{
-            backgroundColor: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: "var(--radius-sm)",
-            overflow: "hidden",
-          }}>
-            <div style={{
-              backgroundColor: "var(--color-ink-rail)",
-              color: "#FFF",
-              padding: "12px 18px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}>
-              <div>
-                <span className="mono-id" style={{ backgroundColor: "rgba(255, 255, 255, 0.1)", color: "#FFF", borderColor: "rgba(255, 255, 255, 0.2)" }}>
-                  {selectedCase.public_id}
-                </span>
-                <span style={{ marginLeft: "8px", fontSize: "12px", color: "var(--color-ink-rail-muted)" }}>
-                  OPERATIONAL CLAIM
-                </span>
-              </div>
-              <StatusStamp state={selectedCase.state} size="sm" />
-            </div>
-
-            <div style={{ padding: "20px" }}>
-              <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--color-text-primary)" }}>
-                {selectedCase.title}
-              </h2>
-              <p style={{ fontSize: "13px", color: "var(--color-text-secondary)", marginTop: "4px", lineHeight: 1.5 }}>
-                {selectedCase.description}
-              </p>
-
-              <div style={{
-                margin: "14px 0",
-                padding: "10px 14px",
-                backgroundColor: "var(--color-surface-elevated)",
-                border: "1px solid var(--color-border-subtle)",
-                borderRadius: "var(--radius-sm)",
-                fontSize: "12px",
-                color: "var(--color-text-secondary)",
-              }}>
-                📍 Location: <strong>{selectedCase.address_reference}</strong> &bull; Lat: {selectedCase.latitude.toFixed(5)}, Lon: {selectedCase.longitude.toFixed(5)}
-              </div>
-
-              <form onSubmit={handleClaimSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
-                    Work Summary / Repair Description
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Completed asphalt repaving and cold-mix patch compaction"
-                    value={workSummary}
-                    onChange={(e) => setWorkSummary(e.target.value)}
-                    required
-                    style={{
-                      width: "100%",
-                      padding: "7px 10px",
-                      fontSize: "13px",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: "var(--radius-sm)",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
-                    Technical Actions Taken & Materials
-                  </label>
-                  <textarea
-                    rows={4}
-                    placeholder="Document specific engineering actions, crew details, materials applied..."
-                    value={actionsTaken}
-                    onChange={(e) => setActionsTaken(e.target.value)}
-                    required
-                    style={{
-                      width: "100%",
-                      padding: "7px 10px",
-                      fontSize: "13px",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: "var(--radius-sm)",
-                      lineHeight: 1.5,
-                    }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="btn btn-primary"
-                  style={{ alignSelf: "flex-start" }}
-                >
-                  <Wrench size={13} /> {submitting ? "Submitting Claim..." : "File Resolution Claim"}
-                </button>
-              </form>
-            </div>
-          </div>
-        ) : (
-          <div style={{
-            backgroundColor: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: "var(--radius-sm)",
-            padding: "40px",
-            textAlign: "center",
-            color: "var(--color-text-muted)",
-          }}>
-            Select a work order from the queue to log operations.
+      <div className="workspace">
+        {statusMsg && (
+          <div
+            role="status"
+            style={{
+              padding: "var(--space-2) var(--space-3)",
+              borderLeft: `2px solid ${statusMsg.includes("Error") ? "var(--danger)" : "var(--success)"}`,
+              background: "var(--surface)",
+              color: statusMsg.includes("Error") ? "var(--danger)" : "var(--success)",
+              marginBottom: "var(--space-4)",
+            }}
+          >
+            {statusMsg}
           </div>
         )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(300px, 1.2fr) minmax(400px, 1.8fr)", gap: "var(--space-5)" }}>
+          {/* Work Orders List */}
+          <div>
+            <SectionHeader index="01" title={`Work Order Queue (${assignedCases.length})`} />
+
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+              {assignedCases.length === 0 ? (
+                <p className="empty" style={{ padding: "var(--space-4)" }}>No pending work orders assigned to this terminal.</p>
+              ) : (
+                assignedCases.map((c) => {
+                  const isSelected = selectedCase?.id === c.id;
+                  return (
+                    <div
+                      key={c.id}
+                      onClick={() => setSelectedCase(c)}
+                      style={{
+                        padding: "var(--space-3)",
+                        borderBottom: "1px solid var(--border)",
+                        cursor: "pointer",
+                        background: isSelected ? "var(--selection)" : "transparent",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                        <code style={{ fontWeight: 600 }}>{c.public_id}</code>
+                        <StatusStamp state={c.state} size="sm" />
+                      </div>
+                      <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
+                        {c.title}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                        {c.address_reference} · Priority: {c.priority_score.toFixed(1)}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Resolution Claim Form */}
+          <div>
+            <SectionHeader index="02" title="Resolution claim station" />
+
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "var(--space-4)" }}>
+              {selectedCase ? (
+                <form onSubmit={handleClaimSubmit} style={{ margin: 0 }}>
+                  <div style={{ marginBottom: "var(--space-3)", paddingBottom: "var(--space-2)", borderBottom: "1px solid var(--border)" }}>
+                    <span className="muted" style={{ fontSize: "11px" }}>Selected Case</span>
+                    <h3 style={{ margin: "2px 0 0", fontSize: "14px" }}>
+                      <code>{selectedCase.public_id}</code> — {selectedCase.title}
+                    </h3>
+                  </div>
+
+                  <div style={{ marginBottom: "var(--space-3)" }}>
+                    <label htmlFor="summary-input">Work summary</label>
+                    <input
+                      id="summary-input"
+                      type="text"
+                      placeholder="e.g. Cleared storm debris and patched asphalt cavity"
+                      value={workSummary}
+                      onChange={(e) => setWorkSummary(e.target.value)}
+                      required
+                      style={{ width: "100%" }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: "var(--space-3)" }}>
+                    <label htmlFor="actions-textarea">Actions taken & technical specifications</label>
+                    <textarea
+                      id="actions-textarea"
+                      rows={4}
+                      placeholder="Specify materials applied, measurements, equipment used, and operator crew details..."
+                      value={actionsTaken}
+                      onChange={(e) => setActionsTaken(e.target.value)}
+                      required
+                      style={{ width: "100%" }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="button-primary"
+                    style={{ width: "100%" }}
+                  >
+                    {submitting ? "Submitting claim..." : "File Resolution Claim"}
+                  </button>
+                </form>
+              ) : (
+                <p className="empty">Select a work order from the queue to file resolution evidence.</p>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
