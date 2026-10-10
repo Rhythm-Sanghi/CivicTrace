@@ -9,19 +9,19 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"
-    
+
     SECRET_KEY: str = "civictrace-insecure-development-secret-change-in-production-2026"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 # 24 hours
-    
+
     # SQLite default for local zero-dependency development; PostgreSQL+PostGIS in production
     DATABASE_URL: str = "sqlite:///./civictrace_dev.db"
-    
+
     STORAGE_DIR: str = "./storage"
     UPLOAD_DIR: str = "./storage/uploads"
     EXPORT_DIR: str = "./storage/exports"
     MAX_UPLOAD_SIZE_BYTES: int = 10 * 1024 * 1024 # 10MB
-    
+
     CORS_ORIGINS: Union[List[str], str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     # Resolution Verification Policy Constants

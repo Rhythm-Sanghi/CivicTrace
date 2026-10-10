@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from typing import Optional, List, Dict
+from pydantic import BaseModel, Field, ConfigDict
 from app.models.entities import (
     UserRole,
     CaseState,

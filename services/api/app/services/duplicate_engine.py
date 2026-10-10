@@ -1,7 +1,7 @@
 import math
 import re
-from typing import List, Tuple, Dict, Any
-from datetime import datetime, timezone
+from typing import List, Dict, Any
+from datetime import timezone
 from sqlalchemy.orm import Session
 from app.models.entities import Report, Case, DuplicateCandidate, CaseState
 from app.core.security import canonical_json
@@ -78,7 +78,7 @@ class DuplicateDetectionEngine:
         case_dt = target_case.updated_at or target_case.created_at
         if case_dt and case_dt.tzinfo is None:
             case_dt = case_dt.replace(tzinfo=timezone.utc)
-            
+
         if report_dt and case_dt:
             diff_days = abs((report_dt - case_dt).total_seconds()) / 86400.0
         else:

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
-from typing import Dict, Any, Tuple
-from app.models.entities import Case, PriorityBand
+from typing import Tuple
+from app.models.entities import PriorityBand
 from app.core.security import canonical_json
 
 class PriorityEngine:
@@ -12,7 +12,7 @@ class PriorityEngine:
       + Time Unresolved Bonus (+0.2 per 48 hours unresolved, capped at +1.5)
       + Recurrence History Bonus (+0.8 if recurring defect)
       = Raw Civic Priority Score (1.0 to 10.0 scale)
-    
+
     Bands:
       >= 6.0: CRITICAL
       >= 4.2: HIGH

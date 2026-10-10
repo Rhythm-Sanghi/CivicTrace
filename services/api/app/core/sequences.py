@@ -1,5 +1,4 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from app.models.entities import Report, Case
 
 def allocate_report_public_id(db: Session, year: int = 2026) -> str:

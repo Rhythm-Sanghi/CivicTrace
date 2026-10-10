@@ -3,7 +3,7 @@ import json
 import zipfile
 import hashlib
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Tuple
+from typing import List, Tuple
 from sqlalchemy.orm import Session
 from app.models.entities import Case, CaseEvent, Report, ResolutionClaim, VerificationObservation
 from app.core.security import canonical_json

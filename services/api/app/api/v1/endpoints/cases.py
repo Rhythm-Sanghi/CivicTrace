@@ -1,7 +1,7 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from datetime import datetime, timezone
 import os
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -33,7 +33,6 @@ from app.schemas.all_schemas import (
 from app.api.deps import get_current_user_optional, get_current_user, require_roles
 from app.services.state_machine import CaseStateMachine
 from app.services.ledger import LedgerService
-from app.services.priority_engine import PriorityEngine
 from app.services.export_service import ExportService
 from app.services.verification_policy import VerificationPolicyEngine
 
@@ -233,7 +232,7 @@ def submit_resolution_claim(
         status="AWAITING_VERIFICATION",
     )
     db.add(claim)
-    
+
     # Update case state explicitly to AWAITING_VERIFICATION
     case.state = CaseState.AWAITING_VERIFICATION
 

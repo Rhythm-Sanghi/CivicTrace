@@ -1,5 +1,4 @@
-from typing import List, Optional, Dict, Any, Tuple
-from datetime import datetime, timezone
+from typing import Optional, Tuple
 from sqlalchemy.orm import Session
 from app.models.entities import (
     Case,
@@ -8,7 +7,6 @@ from app.models.entities import (
     UserRole,
     VerificationOutcome,
     VerificationObservation,
-    ResolutionClaim,
 )
 from app.core.config import settings
 

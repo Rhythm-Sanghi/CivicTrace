@@ -10,9 +10,7 @@ from app.models.entities import (
     Report,
     Case,
     CaseState,
-    ReportModerationStatus,
     PriorityBand,
-    DuplicateCandidate,
     ResolutionClaim,
     VerificationObservation,
     VerificationOutcome,
@@ -20,7 +18,6 @@ from app.models.entities import (
 )
 from app.services.ledger import LedgerService
 from app.services.priority_engine import PriorityEngine
-from app.services.duplicate_engine import DuplicateDetectionEngine
 
 def seed_database(reset: bool = False):
     if reset:

@@ -4,11 +4,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.db.session import Base, get_db
-from app.db.seed import seed_database
 from app.services.ledger import LedgerService
 from app.services.duplicate_engine import haversine_distance_meters
 from app.services.export_service import ExportService
-from app.models.entities import Case, User, UserRole
+from app.models.entities import Case
 
 # Use memory or dedicated test sqlite db
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test_civictrace.db"
@@ -67,7 +66,7 @@ def test_append_only_ledger_hash_chaining(db_session):
     db_session.commit()
 
     # Append 3 events
-    e1 = LedgerService.append_event(db_session, case, "REPORT_CREATED", {"detail": "Initial report"})
+    LedgerService.append_event(db_session, case, "REPORT_CREATED", {"detail": "Initial report"})
     e2 = LedgerService.append_event(db_session, case, "INVESTIGATION_STARTED", {"officer": "Team A"})
     e3 = LedgerService.append_event(db_session, case, "RESOLUTION_CLAIMED", {"work": "Fixed bulb"})
     db_session.commit()

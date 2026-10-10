@@ -1,4 +1,4 @@
-from typing import List, Dict, Set
+from typing import Dict, Set
 from app.models.entities import CaseState, UserRole
 
 # Valid state transitions mapping:

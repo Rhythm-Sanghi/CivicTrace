@@ -1,13 +1,12 @@
 import pytest
 import os
 import zipfile
-import json
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.db.session import Base, get_db
-from app.models.entities import User, UserRole, IssueCategory, Case, Report, CaseState
+from app.models.entities import User, UserRole, IssueCategory
 from app.services.export_service import ExportService
 from app.core.security import get_password_hash, create_access_token
 

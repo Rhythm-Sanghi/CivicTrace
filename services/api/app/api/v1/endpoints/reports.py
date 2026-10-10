@@ -1,7 +1,6 @@
 import os
 import hashlib
 from typing import List, Optional
-import random
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse
@@ -106,11 +105,11 @@ def submit_report(
     # If no candidate has high score, automatically promote or link
     # For transparency: if no strong candidates found (composite < 0.55), automatically promote this report into a new public Case
     strong_candidate = next((c for c in candidates if c.composite_score >= 0.55), None)
-    
+
     if not strong_candidate:
         # Create consolidated Case with collision-resistant public ID
         case_public_id = allocate_case_public_id(db)
-        
+
         score, band, breakdown = PriorityEngine.calculate_priority(
             category_weight=category.default_severity_weight,
             report_count=1,
@@ -297,7 +296,7 @@ def decide_duplicate(
         report = candidate.report
         if not report.case_id:
             case_public_id = allocate_case_public_id(db)
-            
+
             score, band, breakdown = PriorityEngine.calculate_priority(
                 category_weight=report.category.default_severity_weight,
                 report_count=1,

@@ -1,10 +1,7 @@
 import pytest
-from datetime import datetime, timezone, timedelta
 from app.models.entities import Case, User, UserRole, CaseState, VerificationOutcome, IssueCategory
 from app.services.verification_policy import VerificationPolicyEngine
 from app.services.state_machine import CaseStateMachine
-from app.services.duplicate_engine import DuplicateDetectionEngine
-from app.core.config import settings
 
 def test_operator_blocked_from_self_verification(db_session):
     cat = IssueCategory(name="Test Lights", code="TL01", default_severity_weight=2.0)

@@ -1,6 +1,5 @@
 import enum
 from datetime import datetime, timezone
-from typing import Optional, List
 import uuid
 
 from sqlalchemy import (
@@ -13,7 +12,6 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     Enum as SQLEnum,
-    Table,
     Index
 )
 from sqlalchemy.orm import relationship
@@ -138,17 +136,17 @@ class Report(Base):
     category_id = Column(String(36), ForeignKey("issue_categories.id"), nullable=False)
     reporter_id = Column(String(36), ForeignKey("users.id"), nullable=True) # None for guest reporting
     guest_pseudonym = Column(String(100), nullable=True) # Privacy-preserving pseudonym for guest
-    
+
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=False)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     address_reference = Column(String(255), nullable=True)
     accuracy_meters = Column(Float, nullable=True)
-    
+
     moderation_status = Column(SQLEnum(ReportModerationStatus), default=ReportModerationStatus.APPROVED, nullable=False)
     moderation_notes = Column(Text, nullable=True)
-    
+
     case_id = Column(String(36), ForeignKey("cases.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
@@ -169,18 +167,18 @@ class Case(Base):
     public_id = Column(String(30), unique=True, index=True, nullable=False) # E.g., CAS-2026-0001
     category_id = Column(String(36), ForeignKey("issue_categories.id"), nullable=False)
     service_area_id = Column(String(36), ForeignKey("service_areas.id"), nullable=True)
-    
+
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=False)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     address_reference = Column(String(255), nullable=True)
-    
+
     state = Column(SQLEnum(CaseState), default=CaseState.SUBMITTED, nullable=False)
     priority_score = Column(Float, default=1.0, nullable=False)
     priority_band = Column(SQLEnum(PriorityBand), default=PriorityBand.LOW, nullable=False)
     priority_breakdown = Column(Text, nullable=True) # JSON explainability string
-    
+
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
     verified_at = Column(DateTime(timezone=True), nullable=True)
@@ -206,7 +204,7 @@ class DuplicateCandidate(Base):
     id = Column(String(36), primary_key=True, default=generate_uuid)
     report_id = Column(String(36), ForeignKey("reports.id"), nullable=False)
     target_case_id = Column(String(36), ForeignKey("cases.id"), nullable=False)
-    
+
     distance_meters = Column(Float, nullable=False)
     spatial_score = Column(Float, nullable=False)
     text_score = Column(Float, nullable=False)
@@ -214,7 +212,7 @@ class DuplicateCandidate(Base):
     temporal_score = Column(Float, nullable=False)
     composite_score = Column(Float, nullable=False)
     explanation = Column(Text, nullable=False) # JSON or markdown rationale
-    
+
     status = Column(String(20), default="PENDING", nullable=False) # PENDING, APPROVED, REJECTED
     reviewed_by_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
@@ -252,7 +250,7 @@ class CaseEvent(Base):
     event_type = Column(String(50), nullable=False)
     actor_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     public_actor_label = Column(String(100), nullable=False) # E.g., "Citizen Observer", "Public Works Operator"
-    
+
     payload_json = Column(Text, nullable=False) # Canonical JSON string
     schema_version = Column(Integer, default=1, nullable=False)
     previous_event_hash = Column(String(64), nullable=False)
@@ -275,7 +273,7 @@ class EvidenceAsset(Base):
     case_id = Column(String(36), ForeignKey("cases.id"), nullable=True)
     resolution_claim_id = Column(String(36), ForeignKey("resolution_claims.id"), nullable=True)
     verification_id = Column(String(36), ForeignKey("verification_observations.id"), nullable=True)
-    
+
     file_name = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False)
     file_size = Column(Integer, nullable=False)
@@ -314,7 +312,7 @@ class VerificationObservation(Base):
     case_id = Column(String(36), ForeignKey("cases.id"), nullable=False)
     verifier_id = Column(String(36), ForeignKey("users.id"), nullable=True) # Citizen verifier or guest
     guest_pseudonym = Column(String(100), nullable=True)
-    
+
     outcome = Column(SQLEnum(VerificationOutcome), nullable=False)
     notes = Column(Text, nullable=False)
     is_dispute = Column(Boolean, default=False, nullable=False)

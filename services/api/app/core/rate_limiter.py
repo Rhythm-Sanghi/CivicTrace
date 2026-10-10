@@ -1,5 +1,5 @@
 import time
-from typing import Dict, Tuple
+from typing import Dict
 from fastapi import Request, HTTPException, status
 
 # In-memory sliding window rate limiter

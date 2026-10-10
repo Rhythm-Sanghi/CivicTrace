@@ -18,11 +18,15 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install fastapi uvicorn sqlalchemy alembic pydantic pydantic-settings bcrypt pyjwt python-multipart pytest httpx geoalchemy2 shapely ruff "pydantic[email]"
+          pip install -r services/api/requirements.txt
+      - name: Lint with Ruff
+        run: |
+          cd services/api
+          ruff check .
       - name: Run Backend Tests
         run: |
           cd services/api
-          python -m pytest app/tests/ -v
+          python -m pytest -v
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -32,9 +36,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Install dependencies and build
+      - name: Clean install dependencies
         run: |
           cd apps/web
-          npm install
+          npm ci
+      - name: Run Frontend Tests
+        run: |
+          cd apps/web
           npm run test
+      - name: Build Web Bundle
+        run: |
+          cd apps/web
           npm run build
