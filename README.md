@@ -104,7 +104,7 @@ cd services/api
 python -m pytest app/tests/ -v
 ```
 
-**9/9 tests pass**, covering:
+**10/10 tests pass**, covering:
 1. Append-only SHA-256 hash chain verification and mathematical tamper detection
 2. Deterministic Haversine spatial correlation and priority calculation
 3. Conflict of interest enforcement: operators strictly blocked from self-verifying resolution claims (`403 Forbidden`)
@@ -113,13 +113,14 @@ python -m pytest app/tests/ -v
 6. Unauthorized state transition prevention
 7. Full lifecycle end-to-end integration flow
 8. ZIP export evidence manifest hashing and Zip-Slip traversal protection
+9. Priority band engine mappings and critical hazard escalations
 
 ### Frontend Component Tests (Vitest)
 ```bash
 cd apps/web
 npm run test
 ```
-**2/2 tests pass** (UI layout, status badges, and button interactions).
+**2/2 tests pass** (UI layout, numbered navigation, and Benchlight components).
 
 ### End-to-End Browser Automation & Screenshot Capture (Playwright)
 ```bash
@@ -136,14 +137,14 @@ python scripts/verify_evidence.py storage/exports/<package_name>.zip
 
 ## 🎨 Visual Identity
 
-CivicTrace follows the **Workshop + Gridline + Studio Utility** design philosophy:
+CivicTrace follows the **Benchlight Design System** (Workshop + Gridline + Studio Utility):
 - **Workshop:** Purposeful density, clear tools, and honest controls.
-- **Gridline:** Ruled tables, baseline rhythm, and aligned data columns.
-- **Studio Utility:** Restrained civic blue `#285E79`, verified green `#39735A`, attention orange `#BC7135`, and off-white `#F5F4F0` surfaces.
+- **Gridline:** Ruled tables, baseline rhythm, aligned columns, and fine separators.
+- **Studio Utility:** Light canvas `#f4f4f1`, warm brass accent `#795f2f`, soft beige selection `#e9e2d2`, and clean typography (`Segoe UI` + `Cascadia Mono`).
 
 ---
 
 ## 📜 License & Compliance
 
 Licensed under the **Apache License, Version 2.0**. See [`LICENSE`](LICENSE) for details.
-CivicTrace does not require or bundle proprietary Google Maps or Mapbox API keys.
+CivicTrace does not require or bundle proprietary Google Maps or Mapbox API keys. Demonstrations use an offline schematic map model of Indore Ward 34 with illustrative municipal records.
