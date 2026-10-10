@@ -1,0 +1,227 @@
+/* CivicTrace: Workshop + Gridline + Studio Utility Design Tokens */
+:root {
+  --color-canvas: #F5F4F0;
+  --color-surface: #FFFFFF;
+  --color-surface-elevated: #FAFAF8;
+  --color-surface-subtle: #EFEFE9;
+
+  --color-text-primary: #202722;
+  --color-text-secondary: #68716B;
+  --color-text-muted: #8F9992;
+  --color-text-inverse: #FFFFFF;
+
+  --color-border: #D9DED8;
+  --color-border-subtle: #E8ECE7;
+  --color-border-strong: #A6AFA4;
+
+  /* Restrained civic accents */
+  --color-civic-blue: #285E79;
+  --color-civic-blue-hover: #1E495E;
+  --color-civic-blue-subtle: #EDF4F7;
+
+  --color-attention-orange: #BC7135;
+  --color-attention-orange-subtle: #FDF4ED;
+
+  --color-verified-green: #39735A;
+  --color-verified-green-subtle: #EFF7F3;
+
+  --color-disputed-red: #A64F49;
+  --color-disputed-red-subtle: #FDF1F0;
+
+  /* Typography */
+  --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --font-size-xs: 0.75rem;     /* 12px */
+  --font-size-sm: 0.84375rem;  /* 13.5px */
+  --font-size-base: 0.9375rem; /* 15px */
+  --font-size-md: 1.0625rem;   /* 17px */
+  --font-size-lg: 1.25rem;     /* 20px */
+  --font-size-xl: 1.5rem;      /* 24px */
+  --font-size-2xl: 1.875rem;   /* 30px */
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Line Heights */
+  --line-height-tight: 1.25;
+  --line-height-base: 1.5;
+  --line-height-relaxed: 1.625;
+
+  /* Spacing Rhythm (4px baseline scale) */
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-12: 3rem;    /* 48px */
+
+  /* Borders & Radius (Workshop utility: sharp or subtle 3px/4px radius) */
+  --radius-none: 0px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+
+  /* Document Shadows (Restrained studio feel) */
+  --shadow-subtle: 0 1px 2px rgba(32, 39, 34, 0.05);
+  --shadow-card: 0 1px 3px rgba(32, 39, 34, 0.08), 0 1px 2px rgba(32, 39, 34, 0.04);
+  --shadow-elevated: 0 4px 12px rgba(32, 39, 34, 0.1);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Document & Gridline Utility Classes */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+.mono-id {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.04em;
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  display: inline-block;
+}
+
+.archival-stamp {
+  font-family: var(--font-family-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: var(--font-weight-semibold);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stamp-verified {
+  background-color: var(--color-verified-green-subtle);
+  color: var(--color-verified-green);
+  border: 1px solid var(--color-verified-green);
+}
+
+.stamp-disputed {
+  background-color: var(--color-disputed-red-subtle);
+  color: var(--color-disputed-red);
+  border: 1px solid var(--color-disputed-red);
+}
+
+.stamp-claimed {
+  background-color: var(--color-attention-orange-subtle);
+  color: var(--color-attention-orange);
+  border: 1px solid var(--color-attention-orange);
+}
+
+.stamp-submitted {
+  background-color: var(--color-civic-blue-subtle);
+  color: var(--color-civic-blue);
+  border: 1px solid var(--color-civic-blue);
+}
+
+/* Workshop Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+
+.btn-primary {
+  background-color: var(--color-civic-blue);
+  color: var(--color-text-inverse);
+  border-color: var(--color-civic-blue);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-civic-blue-hover);
+}
+
+.btn-outline {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+}
+
+.btn-outline:hover {
+  background-color: var(--color-surface-subtle);
+  border-color: var(--color-border-strong);
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: var(--font-size-xs);
+}
+
+.card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-subtle);
+}
+
+.ruled-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.ruled-table th {
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  border-bottom: 2px solid var(--color-border);
+  background-color: var(--color-surface-elevated);
+}
+
+.ruled-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: top;
+}
+
+.ruled-table tr:hover td {
+  background-color: var(--color-surface-elevated);
+}
