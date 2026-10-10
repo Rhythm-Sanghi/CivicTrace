@@ -40,7 +40,7 @@ def run_real_e2e_lifecycle():
         page.fill("input[type='password']", "CitizenPass2026!")
         page.click("button[type='submit']")
         page.wait_for_url(f"{WEB_BASE}/explorer", timeout=10000)
-        page.wait_for_selector("text=Public Infrastructure Ledger", timeout=10000)
+        page.wait_for_selector("text=Public infrastructure records", timeout=10000)
         print("  [OK] Citizen authenticated successfully. Session stored.")
 
         # Step 2: Citizen Submits a New Infrastructure Defect
@@ -63,7 +63,7 @@ def run_real_e2e_lifecycle():
         # Step 3: Verified in Public Cases Explorer
         print("\n[Step 3/14] Verifying report is persisted in Explorer...")
         page.click("text=View in Public Cases Explorer")
-        page.wait_for_selector("text=Public Infrastructure Ledger", timeout=10000)
+        page.wait_for_selector("text=Public infrastructure records", timeout=10000)
         page.wait_for_selector("text=Hazardous Exposed Cable Conduit near Chhatri Bagh Junction", timeout=10000)
         page.screenshot(path="docs/screenshots/07_new_report_persisted.png")
         print("  [OK] New report persisted and visible in public ledger table.")
