@@ -112,9 +112,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
       {/* Benchlight Application Status Bar */}
       <footer className="app-status-bar">
-        <span className="status-context">Local · Offline</span>
+        <span className="status-context">Local SQLite Workspace</span>
         <span role="status">
-          SHA-256 Ledger Verified Intact · Indore Ward 34
+          SHA-256 Event Chain Active · Schematic Map Model (Indore Ward 34)
         </span>
         <span className="status-version">
           v1.0.0

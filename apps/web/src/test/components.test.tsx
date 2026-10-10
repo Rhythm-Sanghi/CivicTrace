@@ -24,7 +24,7 @@ describe("Frontend Core Components & Benchlight Design System", () => {
     expect(screen.getByText("Intelligence")).toBeInTheDocument();
     expect(screen.getByText("04")).toBeInTheDocument();
     expect(screen.getByText("Report issue")).toBeInTheDocument();
-    expect(screen.getByText("Local · Offline")).toBeInTheDocument();
+    expect(screen.getByText("Local SQLite Workspace")).toBeInTheDocument();
     expect(screen.getByText("Child workspace")).toBeInTheDocument();
   });
 

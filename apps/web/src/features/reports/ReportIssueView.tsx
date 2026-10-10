@@ -6,54 +6,148 @@ import { PageHeading, SectionHeader } from "../../components/FieldPrimitives";
 export const ReportIssueView: React.FC = () => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [categoryId, setCategoryId] = useState<string>("");
-  const [title, setTitle] = useState<string>("");
-  const [description, setDescription] = useState<string>("");
-  const [latitude, setLatitude] = useState<number>(22.7196); // Indore default
-  const [longitude, setLongitude] = useState<number>(75.8577);
-  const [addressRef, setAddressRef] = useState<string>("");
-  const [pseudonym, setPseudonym] = useState<string>("");
+
+  // Form fields with draft local preservation
+  const [categoryId, setCategoryId] = useState<string>(() => {
+    return localStorage.getItem("civictrace_draft_cat") || "";
+  });
+  const [title, setTitle] = useState<string>(() => {
+    return localStorage.getItem("civictrace_draft_title") || "";
+  });
+  const [description, setDescription] = useState<string>(() => {
+    return localStorage.getItem("civictrace_draft_desc") || "";
+  });
+  const [latitude, setLatitude] = useState<number>(() => {
+    const saved = localStorage.getItem("civictrace_draft_lat");
+    return saved ? parseFloat(saved) : 22.7196; // Indore default
+  });
+  const [longitude, setLongitude] = useState<number>(() => {
+    const saved = localStorage.getItem("civictrace_draft_lon");
+    return saved ? parseFloat(saved) : 75.8577;
+  });
+  const [addressRef, setAddressRef] = useState<string>(() => {
+    return localStorage.getItem("civictrace_draft_addr") || "";
+  });
+  const [pseudonym, setPseudonym] = useState<string>(() => {
+    return localStorage.getItem("civictrace_draft_name") || "";
+  });
+
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [evidencePreviewUrl, setEvidencePreviewUrl] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [locationFeedback, setLocationFeedback] = useState<string>("");
   const [successResult, setSuccessResult] = useState<any | null>(null);
+
+  // Auto-save drafts
+  useEffect(() => {
+    localStorage.setItem("civictrace_draft_cat", categoryId);
+    localStorage.setItem("civictrace_draft_title", title);
+    localStorage.setItem("civictrace_draft_desc", description);
+    localStorage.setItem("civictrace_draft_lat", latitude.toString());
+    localStorage.setItem("civictrace_draft_lon", longitude.toString());
+    localStorage.setItem("civictrace_draft_addr", addressRef);
+    localStorage.setItem("civictrace_draft_name", pseudonym);
+  }, [categoryId, title, description, latitude, longitude, addressRef, pseudonym]);
 
   useEffect(() => {
     api.getCategories().then((cats) => {
       setCategories(cats);
-      if (cats.length > 0) setCategoryId(cats[0].id);
+      if (cats.length > 0 && !categoryId) setCategoryId(cats[0].id);
     });
   }, []);
 
+  const clearDraft = () => {
+    localStorage.removeItem("civictrace_draft_cat");
+    localStorage.removeItem("civictrace_draft_title");
+    localStorage.removeItem("civictrace_draft_desc");
+    localStorage.removeItem("civictrace_draft_lat");
+    localStorage.removeItem("civictrace_draft_lon");
+    localStorage.removeItem("civictrace_draft_addr");
+    localStorage.removeItem("civictrace_draft_name");
+    setTitle("");
+    setDescription("");
+    setAddressRef("");
+    setPseudonym("");
+    setEvidenceFile(null);
+    if (evidencePreviewUrl) URL.revokeObjectURL(evidencePreviewUrl);
+    setEvidencePreviewUrl(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErrorMsg("");
+    const file = e.target.files ? e.target.files[0] : null;
+    if (!file) {
+      setEvidenceFile(null);
+      if (evidencePreviewUrl) URL.revokeObjectURL(evidencePreviewUrl);
+      setEvidencePreviewUrl(null);
+      return;
+    }
+
+    const validTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(jpe?g|png|webp|pdf)$/i)) {
+      setErrorMsg("Invalid file type. Only JPG, PNG, WEBP, and PDF documents are permitted.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMsg("File size exceeds 10MB maximum evidentiary payload limit.");
+      return;
+    }
+
+    setEvidenceFile(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setEvidencePreviewUrl(url);
+    } else {
+      setEvidencePreviewUrl(null);
+    }
+  };
+
   const handleUseBrowserLocation = () => {
+    setLocationFeedback("");
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           setLatitude(pos.coords.latitude);
           setLongitude(pos.coords.longitude);
+          setLocationFeedback("Browser GPS coordinates acquired successfully.");
         },
         () => {
-          setErrorMsg("Could not retrieve browser GPS. Using manual coordinates.");
+          setLocationFeedback("GPS lock unavailable. Manual Indore coordinates active.");
         }
       );
+    } else {
+      setLocationFeedback("Geolocation API unsupported by browser.");
     }
   };
 
+  const isDescribeValid = title.trim().length >= 5 && description.trim().length >= 10;
+  const isLocateValid = latitude !== 0 && longitude !== 0 && addressRef.trim().length >= 3;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isDescribeValid) {
+      setErrorMsg("Please enter a valid issue title (at least 5 characters) and description (at least 10 characters).");
+      return;
+    }
+    if (!isLocateValid) {
+      setErrorMsg("Please provide a valid street or landmark location reference.");
+      return;
+    }
+
     setLoading(true);
     setErrorMsg("");
 
     try {
       const res = await api.submitReport({
         category_id: categoryId,
-        title,
-        description,
+        title: title.trim(),
+        description: description.trim(),
         latitude,
         longitude,
-        address_reference: addressRef,
-        guest_pseudonym: pseudonym || undefined,
+        address_reference: addressRef.trim(),
+        guest_pseudonym: pseudonym.trim() || undefined,
       });
 
       if (evidenceFile) {
@@ -64,6 +158,7 @@ export const ReportIssueView: React.FC = () => {
         }
       }
 
+      clearDraft();
       setSuccessResult(res);
       setLoading(false);
     } catch (err: any) {
@@ -71,6 +166,8 @@ export const ReportIssueView: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const selectedCategoryObj = categories.find((c) => c.id === categoryId);
 
   return (
     <>
@@ -104,10 +201,13 @@ export const ReportIssueView: React.FC = () => {
               fontSize: "12px",
               display: "flex",
               flexDirection: "column",
-              gap: "4px",
+              gap: "6px",
+              border: "1px solid var(--border)",
             }}>
-              <div><strong>Report Reference:</strong> <code>{successResult.public_id}</code></div>
-              <div><strong>Hazard:</strong> {successResult.title}</div>
+              <div><strong>Report Reference:</strong> <code style={{ fontWeight: 600 }}>{successResult.public_id}</code></div>
+              <div><strong>Hazard Category:</strong> {selectedCategoryObj?.name || successResult.category?.name}</div>
+              <div><strong>Title:</strong> {successResult.title}</div>
+              <div><strong>Location:</strong> {successResult.address_reference}</div>
               <div><strong>Coordinates:</strong> <code className="numeric">{successResult.latitude.toFixed(5)}, {successResult.longitude.toFixed(5)}</code></div>
             </div>
 
@@ -119,12 +219,7 @@ export const ReportIssueView: React.FC = () => {
                 View in Public Cases Explorer
               </button>
               <button
-                onClick={() => {
-                  setSuccessResult(null);
-                  setTitle("");
-                  setDescription("");
-                  setAddressRef("");
-                }}
+                onClick={() => setSuccessResult(null)}
                 className="btn-outline"
               >
                 Submit another observation
@@ -138,157 +233,239 @@ export const ReportIssueView: React.FC = () => {
             gap: "var(--space-5)",
             alignItems: "start",
           }}>
-            {/* Form Card */}
+            {/* Form Container */}
             <div>
               <SectionHeader index="01" title="Defect intake form" />
 
+              {errorMsg && (
+                <div role="alert" style={{
+                  background: "#fbf1f0",
+                  color: "var(--danger)",
+                  border: "1px solid var(--danger)",
+                  padding: "var(--space-2) var(--space-3)",
+                  marginBottom: "var(--space-3)",
+                  fontSize: "12px",
+                }}>
+                  {errorMsg}
+                </div>
+              )}
+
               <div style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "var(--space-4)" }}>
-                {errorMsg && (
-                  <div role="alert" style={{ marginBottom: "var(--space-3)" }}>
-                    {errorMsg}
-                  </div>
-                )}
-
                 <form onSubmit={handleSubmit} style={{ margin: 0 }}>
-                  <div style={{ marginBottom: "var(--space-3)" }}>
-                    <label htmlFor="cat-select">Hazard category</label>
-                    <select
-                      id="cat-select"
-                      value={categoryId}
-                      onChange={(e) => setCategoryId(e.target.value)}
-                      required
-                      style={{ width: "100%" }}
-                    >
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Stage 1: Describe Defect */}
+                  <div style={{ marginBottom: "var(--space-4)" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--accent)", marginBottom: "var(--space-2)" }}>
+                      STAGE 1: DESCRIBE DEFECT
+                    </div>
 
-                  <div style={{ marginBottom: "var(--space-3)" }}>
-                    <label htmlFor="title-input">Brief summary / title</label>
-                    <input
-                      id="title-input"
-                      type="text"
-                      placeholder="e.g. Deep pothole on MG Road near Rajwada intersection"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      required
-                      style={{ width: "100%" }}
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: "var(--space-3)" }}>
-                    <label htmlFor="desc-input">Observed details & severity</label>
-                    <textarea
-                      id="desc-input"
-                      rows={4}
-                      placeholder="Detail what you observed, physical depth, hazards to pedestrians, water leaks, or safety risks..."
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      required
-                      style={{ width: "100%", lineHeight: 1.5 }}
-                    />
-                  </div>
-
-                  {/* Location Picker Box */}
-                  <div style={{
-                    background: "var(--surface-muted)",
-                    padding: "var(--space-3)",
-                    border: "1px solid var(--border)",
-                    marginBottom: "var(--space-3)",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
-                      <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)" }}>
-                        Geographic coordinates
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleUseBrowserLocation}
-                        className="btn-outline btn-sm"
+                    <div style={{ marginBottom: "var(--space-3)" }}>
+                      <label htmlFor="cat-select">Hazard category</label>
+                      <select
+                        id="cat-select"
+                        value={categoryId}
+                        onChange={(e) => setCategoryId(e.target.value)}
+                        required
+                        style={{ width: "100%" }}
                       >
-                        Use GPS location
-                      </button>
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)", marginBottom: "var(--space-2)" }}>
-                      <div>
-                        <label htmlFor="lat-input" style={{ fontSize: "11px" }}>Latitude</label>
-                        <input
-                          id="lat-input"
-                          type="number"
-                          step="0.000001"
-                          value={latitude}
-                          onChange={(e) => setLatitude(parseFloat(e.target.value))}
-                          required
-                          style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "12px" }}
-                        />
+                    <div style={{ marginBottom: "var(--space-3)" }}>
+                      <label htmlFor="title-input">Brief summary / title *</label>
+                      <input
+                        id="title-input"
+                        type="text"
+                        placeholder="e.g. Deep pothole on MG Road near Rajwada intersection"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        required
+                        style={{ width: "100%" }}
+                      />
+                      {title.length > 0 && title.length < 5 && (
+                        <span style={{ fontSize: "11px", color: "var(--danger)" }}>Must be at least 5 characters.</span>
+                      )}
+                    </div>
+
+                    <div style={{ marginBottom: "var(--space-3)" }}>
+                      <label htmlFor="desc-input">Observed details & severity *</label>
+                      <textarea
+                        id="desc-input"
+                        rows={3}
+                        placeholder="Detail what you observed, physical depth, hazards to pedestrians, water leaks, or safety risks..."
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        required
+                        style={{ width: "100%", lineHeight: 1.5 }}
+                      />
+                      {description.length > 0 && description.length < 10 && (
+                        <span style={{ fontSize: "11px", color: "var(--danger)" }}>Must be at least 10 characters.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Stage 2: Locate Defect */}
+                  <div style={{
+                    marginBottom: "var(--space-4)",
+                    paddingTop: "var(--space-3)",
+                    borderTop: "1px solid var(--border)",
+                  }}>
+                    <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--accent)", marginBottom: "var(--space-2)" }}>
+                      STAGE 2: LOCATE DEFECT
+                    </div>
+
+                    <div style={{
+                      background: "var(--surface-muted)",
+                      padding: "var(--space-3)",
+                      border: "1px solid var(--border)",
+                      marginBottom: "var(--space-3)",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)" }}>
+                          WGS84 Coordinates
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleUseBrowserLocation}
+                          className="btn-outline btn-sm"
+                        >
+                          Acquire browser GPS
+                        </button>
                       </div>
-                      <div>
-                        <label htmlFor="lon-input" style={{ fontSize: "11px" }}>Longitude</label>
-                        <input
-                          id="lon-input"
-                          type="number"
-                          step="0.000001"
-                          value={longitude}
-                          onChange={(e) => setLongitude(parseFloat(e.target.value))}
-                          required
-                          style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "12px" }}
-                        />
+
+                      {locationFeedback && (
+                        <div style={{ fontSize: "11px", color: "var(--accent)", marginBottom: "var(--space-2)" }}>
+                          {locationFeedback}
+                        </div>
+                      )}
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)", marginBottom: "var(--space-2)" }}>
+                        <div>
+                          <label htmlFor="lat-input" style={{ fontSize: "11px" }}>Latitude</label>
+                          <input
+                            id="lat-input"
+                            type="number"
+                            step="0.000001"
+                            value={latitude}
+                            onChange={(e) => setLatitude(parseFloat(e.target.value) || 0)}
+                            required
+                            style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "12px" }}
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="lon-input" style={{ fontSize: "11px" }}>Longitude</label>
+                          <input
+                            id="lon-input"
+                            type="number"
+                            step="0.000001"
+                            value={longitude}
+                            onChange={(e) => setLongitude(parseFloat(e.target.value) || 0)}
+                            required
+                            style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "12px" }}
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div>
-                      <label htmlFor="addr-input" style={{ fontSize: "11px" }}>Street / Landmark reference</label>
+                    <div style={{ marginBottom: "var(--space-3)" }}>
+                      <label htmlFor="addr-input">Street / Landmark reference *</label>
                       <input
                         id="addr-input"
                         type="text"
                         placeholder="e.g. Near Rajwada Palace, MG Road intersection"
                         value={addressRef}
                         onChange={(e) => setAddressRef(e.target.value)}
+                        required
                         style={{ width: "100%" }}
                       />
+                      {addressRef.length > 0 && addressRef.length < 3 && (
+                        <span style={{ fontSize: "11px", color: "var(--danger)" }}>Please specify street or landmark.</span>
+                      )}
                     </div>
                   </div>
 
-                  {/* Reporter Pseudonym */}
-                  <div style={{ marginBottom: "var(--space-3)" }}>
-                    <label htmlFor="name-input">Observer name or pseudonym</label>
-                    <input
-                      id="name-input"
-                      type="text"
-                      placeholder="e.g. Aarav M. or Local Commuter"
-                      value={pseudonym}
-                      onChange={(e) => setPseudonym(e.target.value)}
-                      style={{ width: "100%" }}
-                    />
+                  {/* Stage 3: Evidentiary Attachments */}
+                  <div style={{
+                    marginBottom: "var(--space-4)",
+                    paddingTop: "var(--space-3)",
+                    borderTop: "1px solid var(--border)",
+                  }}>
+                    <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--accent)", marginBottom: "var(--space-2)" }}>
+                      STAGE 3: EVIDENTIARY ATTACHMENTS & OBSERVER
+                    </div>
+
+                    <div style={{ marginBottom: "var(--space-3)" }}>
+                      <label htmlFor="name-input">Observer pseudonym / display name (optional)</label>
+                      <input
+                        id="name-input"
+                        type="text"
+                        placeholder="e.g. Aarav M. or Local Resident (leave blank for guest anonymous)"
+                        value={pseudonym}
+                        onChange={(e) => setPseudonym(e.target.value)}
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: "var(--space-3)" }}>
+                      <label htmlFor="file-input">Attach photographic evidence (optional, max 10MB)</label>
+                      <input
+                        id="file-input"
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={handleFileChange}
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+
+                    {evidencePreviewUrl && (
+                      <div style={{
+                        marginBottom: "var(--space-3)",
+                        border: "1px solid var(--border)",
+                        padding: "var(--space-2)",
+                        background: "var(--surface-muted)",
+                      }}>
+                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "4px" }}>
+                          Attached Preview: {evidenceFile?.name} ({(evidenceFile!.size / 1024).toFixed(0)} KB)
+                        </div>
+                        <img
+                          src={evidencePreviewUrl}
+                          alt="Evidence preview"
+                          style={{ maxWidth: "100%", maxHeight: "160px", objectFit: "contain", border: "1px solid var(--border)" }}
+                        />
+                      </div>
+                    )}
                   </div>
 
-                  {/* Evidence File */}
-                  <div style={{ marginBottom: "var(--space-4)" }}>
-                    <label htmlFor="file-input">Attach site photographic evidence (optional)</label>
-                    <input
-                      id="file-input"
-                      type="file"
-                      accept="image/*,.pdf"
-                      onChange={(e) => setEvidenceFile(e.target.files ? e.target.files[0] : null)}
-                      style={{ width: "100%" }}
-                    />
+                  {/* Stage 4: Review Summary Box */}
+                  <div style={{
+                    marginBottom: "var(--space-4)",
+                    padding: "var(--space-3)",
+                    background: "var(--surface-muted)",
+                    border: "1px solid var(--border)",
+                  }}>
+                    <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "var(--space-1)" }}>
+                      STAGE 4: PRE-SUBMISSION VERIFICATION SUMMARY
+                    </div>
+                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                      Category: <strong>{selectedCategoryObj?.name}</strong> · Location: <strong>{addressRef || "Pending location"}</strong>
+                    </div>
                   </div>
 
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || !isDescribeValid || !isLocateValid}
                     className="button-primary"
                     style={{ width: "100%" }}
                   >
-                    {loading ? "Recording observation..." : "Submit public defect observation"}
+                    {loading ? "Recording in ledger..." : "Submit public defect observation"}
                   </button>
                 </form>
               </div>
             </div>
 
-            {/* Right Column: Evidentiary Standards */}
+            {/* Right Column: Evidentiary Standards Panel */}
             <div>
               <SectionHeader index="02" title="Evidentiary standard" />
 

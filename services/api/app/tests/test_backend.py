@@ -111,3 +111,28 @@ def test_export_package_and_manifest_tamper_detection(db_session):
     is_valid, logs = ExportService.verify_export_package(zip_path)
     assert is_valid is True
     assert any("SUCCESS" in l for l in logs)
+
+def test_priority_engine_mappings():
+    from app.services.priority_engine import PriorityEngine
+    from app.models.entities import PriorityBand
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone.utc)
+    # Test high hazard electrical category with multiple reports
+    score_elec, band_elec, _ = PriorityEngine.calculate_priority(
+        category_weight=3.8,
+        report_count=2,
+        created_at=now - timedelta(days=3),
+    )
+    assert score_elec >= 4.2
+    assert band_elec in [PriorityBand.HIGH, PriorityBand.CRITICAL]
+
+    # Test low weight category
+    score_low, band_low, _ = PriorityEngine.calculate_priority(
+        category_weight=1.5,
+        report_count=1,
+        created_at=now,
+    )
+    assert score_low == 1.5
+    assert band_low == PriorityBand.LOW
+

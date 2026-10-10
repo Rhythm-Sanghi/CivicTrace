@@ -1,7 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { api, type Case, type Category } from "../../lib/api";
 import { PageHeading, StatusStamp, SectionHeader } from "../../components/FieldPrimitives";
+
+type SortField = "public_id" | "title" | "priority_score" | "updated_at";
+type SortDirection = "asc" | "desc";
 
 export const CasesExplorerView: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);
@@ -11,6 +14,9 @@ export const CasesExplorerView: React.FC = () => {
   const [selectedState, setSelectedState] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [activeCase, setActiveCase] = useState<Case | null>(null);
+  const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(true);
+  const [sortField, setSortField] = useState<SortField>("priority_score");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   useEffect(() => {
     Promise.all([
@@ -23,20 +29,56 @@ export const CasesExplorerView: React.FC = () => {
     });
   }, []);
 
-  const filteredCases = cases.filter((c) => {
-    if (selectedCategory && c.category_id !== selectedCategory) return false;
-    if (selectedBand && c.priority_band !== selectedBand) return false;
-    if (selectedState && c.state !== selectedState) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        c.title.toLowerCase().includes(q) ||
-        c.public_id.toLowerCase().includes(q) ||
-        (c.address_reference && c.address_reference.toLowerCase().includes(q))
-      );
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
     }
-    return true;
-  });
+  };
+
+  const filteredAndSortedCases = useMemo(() => {
+    const filtered = cases.filter((c) => {
+      if (selectedCategory && c.category_id !== selectedCategory) return false;
+      if (selectedBand && c.priority_band !== selectedBand) return false;
+      if (selectedState && c.state !== selectedState) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        return (
+          c.title.toLowerCase().includes(q) ||
+          c.public_id.toLowerCase().includes(q) ||
+          (c.address_reference && c.address_reference.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    });
+
+    return filtered.sort((a, b) => {
+      let comparison = 0;
+      if (sortField === "public_id") {
+        comparison = a.public_id.localeCompare(b.public_id);
+      } else if (sortField === "title") {
+        comparison = a.title.localeCompare(b.title);
+      } else if (sortField === "priority_score") {
+        comparison = a.priority_score - b.priority_score;
+      } else if (sortField === "updated_at") {
+        const timeA = new Date(a.updated_at || a.created_at).getTime();
+        const timeB = new Date(b.updated_at || b.created_at).getTime();
+        comparison = timeA - timeB;
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [cases, selectedCategory, selectedBand, selectedState, searchQuery, sortField, sortDirection]);
+
+  // Keyboard navigation support
+  const handleKeyDown = (e: React.KeyboardEvent, c: Case) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setActiveCase(c);
+      setIsInspectorOpen(true);
+    }
+  };
 
   return (
     <>
@@ -60,6 +102,7 @@ export const CasesExplorerView: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               aria-label="Filter cases"
+              style={{ width: "100%" }}
             />
           </div>
 
@@ -100,72 +143,135 @@ export const CasesExplorerView: React.FC = () => {
               <option value="RESOLVED">Resolved</option>
               <option value="DISPUTED">Disputed</option>
             </select>
+
+            {activeCase && (
+              <button
+                type="button"
+                onClick={() => setIsInspectorOpen((prev) => !prev)}
+                className="btn-outline btn-sm"
+                title={isInspectorOpen ? "Hide case details pane" : "Show case details pane"}
+              >
+                {isInspectorOpen ? "Hide inspector" : "Show inspector"}
+              </button>
+            )}
           </div>
         </div>
 
         {/* Split View with Flat Table & Inspector */}
-        <div className={`split ${activeCase ? "inspecting" : ""}`}>
-          <div>
+        <div className={`split ${isInspectorOpen && activeCase ? "inspecting" : ""}`}>
+          <div style={{ minWidth: 0, overflowX: "auto" }}>
             <SectionHeader
               index="01"
               title="Public infrastructure records"
-              actionText={`${filteredCases.length} records`}
+              actionText={`${filteredAndSortedCases.length} records`}
             />
 
             <table>
               <thead>
                 <tr>
-                  <th style={{ width: "125px" }}>Reference</th>
-                  <th>Infrastructure issue</th>
-                  <th style={{ width: "200px" }}>Location</th>
-                  <th style={{ width: "160px" }}>Category</th>
-                  <th style={{ width: "140px" }}>Status</th>
-                  <th className="numeric" style={{ width: "75px" }}>Priority</th>
-                  <th className="numeric" style={{ width: "85px" }}>Updated</th>
+                  <th
+                    style={{ width: "115px" }}
+                    className="sortable"
+                    onClick={() => handleSort("public_id")}
+                    title="Sort by reference ID"
+                  >
+                    Reference {sortField === "public_id" ? (sortDirection === "asc" ? "▲" : "▼") : ""}
+                  </th>
+                  <th
+                    style={{ minWidth: "220px", width: isInspectorOpen ? "32%" : "40%" }}
+                    className="sortable"
+                    onClick={() => handleSort("title")}
+                    title="Sort by issue title"
+                  >
+                    Infrastructure issue {sortField === "title" ? (sortDirection === "asc" ? "▲" : "▼") : ""}
+                  </th>
+                  <th style={{ width: isInspectorOpen ? "18%" : "22%" }}>Location</th>
+                  <th style={{ width: isInspectorOpen ? "14%" : "16%" }}>Category</th>
+                  <th style={{ width: "120px" }}>Status</th>
+                  <th
+                    className="numeric sortable"
+                    style={{ width: "75px" }}
+                    onClick={() => handleSort("priority_score")}
+                    title="Sort by priority score"
+                  >
+                    Priority {sortField === "priority_score" ? (sortDirection === "asc" ? "▲" : "▼") : ""}
+                  </th>
+                  <th
+                    className="numeric sortable"
+                    style={{ width: "85px" }}
+                    onClick={() => handleSort("updated_at")}
+                    title="Sort by date"
+                  >
+                    Updated {sortField === "updated_at" ? (sortDirection === "asc" ? "▲" : "▼") : ""}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {filteredCases.map((c) => {
-                  const isSelected = activeCase?.id === c.id;
-                  return (
-                    <tr
-                      key={c.id}
-                      className={isSelected ? "selected" : ""}
-                      onClick={() => setActiveCase(c)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <td>
-                        <code style={{ fontWeight: 600 }}>{c.public_id}</code>
-                      </td>
-                      <td>
-                        <Link to={`/cases/${c.public_id}`} style={{ fontWeight: 600, color: "var(--text-primary)" }}>
-                          {c.title}
-                        </Link>
-                      </td>
-                      <td style={{ color: "var(--text-secondary)", fontSize: "12px" }}>
-                        {c.address_reference}
-                      </td>
-                      <td style={{ color: "var(--text-secondary)", fontSize: "12px" }}>
-                        {c.category?.name}
-                      </td>
-                      <td>
-                        <StatusStamp state={c.state} size="sm" />
-                      </td>
-                      <td className="numeric" style={{ fontWeight: 600, color: "var(--accent)" }}>
-                        {c.priority_score.toFixed(1)}
-                      </td>
-                      <td className="numeric" style={{ color: "var(--text-secondary)", fontSize: "11px" }}>
-                        {new Date(c.updated_at || c.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {filteredAndSortedCases.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: "center", padding: "var(--space-5)", color: "var(--text-secondary)" }}>
+                      No infrastructure cases match the selected filter criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAndSortedCases.map((c) => {
+                    const isSelected = activeCase?.id === c.id;
+                    return (
+                      <tr
+                        key={c.id}
+                        className={isSelected ? "selected" : ""}
+                        onClick={() => {
+                          setActiveCase(c);
+                          setIsInspectorOpen(true);
+                        }}
+                        onKeyDown={(e) => handleKeyDown(e, c)}
+                        tabIndex={0}
+                        aria-selected={isSelected}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <td>
+                          <code style={{ fontWeight: 600 }}>{c.public_id}</code>
+                        </td>
+                        <td>
+                          <div className="table-title-clamp" title={c.title}>
+                            <Link
+                              to={`/cases/${c.public_id}`}
+                              style={{ fontWeight: 600, color: "var(--text-primary)" }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {c.title}
+                            </Link>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="table-text-ellipsis" style={{ color: "var(--text-secondary)", fontSize: "12px" }} title={c.address_reference}>
+                            {c.address_reference}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="table-text-ellipsis" style={{ color: "var(--text-secondary)", fontSize: "12px" }} title={c.category?.name}>
+                            {c.category?.name}
+                          </div>
+                        </td>
+                        <td>
+                          <StatusStamp state={c.state} size="sm" />
+                        </td>
+                        <td className="numeric" style={{ fontWeight: 600, color: "var(--accent)" }}>
+                          {c.priority_score.toFixed(1)}
+                        </td>
+                        <td className="numeric" style={{ color: "var(--text-secondary)", fontSize: "11px" }}>
+                          {new Date(c.updated_at || c.created_at).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
 
           {/* Inspector Pane */}
-          {activeCase && (
+          {isInspectorOpen && activeCase && (
             <aside className="inspector" aria-label="Case inspector">
               <div className="inspector-header">
                 <div>
@@ -174,7 +280,7 @@ export const CasesExplorerView: React.FC = () => {
                 </div>
                 <button
                   className="inspector-close"
-                  onClick={() => setActiveCase(null)}
+                  onClick={() => setIsInspectorOpen(false)}
                   title="Close inspector"
                   aria-label="Close inspector"
                 >
@@ -183,7 +289,7 @@ export const CasesExplorerView: React.FC = () => {
               </div>
 
               <div style={{ marginBottom: "var(--space-3)" }}>
-                <h3 style={{ fontSize: "15px", fontWeight: 600, margin: "0 0 6px", lineHeight: 1.3 }}>
+                <h3 style={{ fontSize: "14px", fontWeight: 600, margin: "0 0 6px", lineHeight: 1.35 }}>
                   {activeCase.title}
                 </h3>
                 <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: 0, lineHeight: 1.45 }}>
@@ -225,6 +331,13 @@ export const CasesExplorerView: React.FC = () => {
               <div className="inspector-row">
                 <label>Corroborated observations</label>
                 <span>{activeCase.report_count} citizen report(s)</span>
+              </div>
+
+              <div className="inspector-row">
+                <label>Last activity</label>
+                <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                  {new Date(activeCase.updated_at || activeCase.created_at).toLocaleString()}
+                </span>
               </div>
 
               <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>
