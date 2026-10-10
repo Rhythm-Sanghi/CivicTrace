@@ -151,10 +151,17 @@ class ExportService:
         try:
             with zipfile.ZipFile(zip_path, "r") as zf:
                 file_list = zf.namelist()
+                # Security: Duplicate zip entry rejection (prevent archive ambiguity attacks)
+                if len(file_list) != len(set(file_list)):
+                    return False, ["TAMPER DETECTED: Duplicate file entries detected in export package."]
+
                 # Security: Zip Slip / Path Traversal Guard
                 for member in file_list:
                     if ".." in member or member.startswith("/") or member.startswith("\\"):
                         return False, [f"SECURITY VULNERABILITY: Malicious path traversal detected in member name '{member}'"]
+
+                if "manifest.json" not in file_list:
+                    return False, ["Corrupt export package: manifest.json missing from root."]
 
                 manifest_data = json.loads(zf.read("manifest.json").decode("utf-8"))
                 expected_files = manifest_data.get("files", {})

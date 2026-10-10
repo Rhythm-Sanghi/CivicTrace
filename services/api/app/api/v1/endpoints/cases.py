@@ -160,27 +160,16 @@ def transition_case_state(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    can_trans, err_msg = CaseStateMachine.can_transition(case.state, target_state, current_user.role)
-    if not can_trans:
-        raise HTTPException(status_code=403, detail=err_msg)
-
-    old_state = case.state
-    case.state = target_state
-
-    if target_state == CaseState.VERIFIED and not case.verified_at:
-        case.verified_at = datetime.now(timezone.utc)
-    elif target_state == CaseState.RESOLVED:
-        case.resolved_at = datetime.now(timezone.utc)
-
-    # Record event in cryptographic ledger
-    LedgerService.append_event(
-        db=db,
-        case=case,
-        event_type=f"STATE_CHANGED_TO_{target_state.value}",
-        payload={"previous_state": old_state.value, "new_state": target_state.value, "notes": notes},
-        actor=current_user,
-        public_actor_label=f"{current_user.role.value.capitalize()} Action",
-    )
+    try:
+        CaseStateMachine.transition_case(
+            db=db,
+            case=case,
+            target_state=target_state,
+            actor=current_user,
+            notes=notes,
+        )
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
 
     db.commit()
     db.refresh(case)

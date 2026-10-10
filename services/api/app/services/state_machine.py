@@ -43,3 +43,57 @@ class CaseStateMachine:
             return False, f"Role {role.value} is not authorized to transition case to {target_state.value}"
 
         return True, ""
+
+    @classmethod
+    def transition_case(
+        cls,
+        db,
+        case,
+        target_state: CaseState,
+        actor,
+        notes: str = None,
+        event_type: str = None,
+        custom_payload: dict = None,
+    ):
+        """
+        Atomically executes state transition, maintains timestamps, and records append-only ledger entry.
+        """
+        from datetime import datetime, timezone
+        from app.services.ledger import LedgerService
+
+        can_trans, err_msg = cls.can_transition(case.state, target_state, actor.role)
+        if not can_trans:
+            raise PermissionError(err_msg)
+
+        old_state = case.state
+        case.state = target_state
+
+        if target_state == CaseState.VERIFIED and not case.verified_at:
+            case.verified_at = datetime.now(timezone.utc)
+        elif target_state == CaseState.RESOLVED:
+            case.resolved_at = datetime.now(timezone.utc)
+
+        actual_event_type = event_type or f"STATE_CHANGED_TO_{target_state.value}"
+        payload = custom_payload or {
+            "previous_state": old_state.value,
+            "new_state": target_state.value,
+            "notes": notes,
+        }
+
+        public_label = f"{actor.role.value.capitalize()} Action"
+        if actor.role == UserRole.REVIEWER:
+            public_label = "Community Reviewer"
+        elif actor.role == UserRole.OPERATOR:
+            public_label = "Public Works Operator"
+        elif actor.role == UserRole.CITIZEN:
+            public_label = "Citizen Observer"
+
+        LedgerService.append_event(
+            db=db,
+            case=case,
+            event_type=actual_event_type,
+            payload=payload,
+            actor=actor,
+            public_actor_label=public_label,
+        )
+        return case

@@ -33,6 +33,7 @@ from app.api.deps import get_current_user_optional, get_current_user, require_ro
 from app.services.duplicate_engine import DuplicateDetectionEngine
 from app.services.priority_engine import PriorityEngine
 from app.services.ledger import LedgerService
+from app.core.sequences import allocate_report_public_id, allocate_case_public_id
 
 router = APIRouter()
 
@@ -74,9 +75,8 @@ def submit_report(
     if not category:
         raise HTTPException(status_code=400, detail="Invalid category ID")
 
-    # Generate public reference ID: e.g. RPT-2026-XXXX
-    count = db.query(Report).count() + 1
-    public_id = f"RPT-2026-{count:04d}"
+    # Allocate collision-resistant monotonic public reference ID: e.g. RPT-2026-XXXX
+    public_id = allocate_report_public_id(db)
 
     # Moderation Policy:
     # Authenticated Reviewer or Administrator reports are pre-approved.
@@ -108,9 +108,8 @@ def submit_report(
     strong_candidate = next((c for c in candidates if c.composite_score >= 0.55), None)
     
     if not strong_candidate:
-        # Create consolidated Case
-        case_count = db.query(Case).count() + 1
-        case_public_id = f"CAS-2026-{case_count:04d}"
+        # Create consolidated Case with collision-resistant public ID
+        case_public_id = allocate_case_public_id(db)
         
         score, band, breakdown = PriorityEngine.calculate_priority(
             category_weight=category.default_severity_weight,
@@ -193,8 +192,7 @@ def moderate_report(
 
     # If approved and not yet linked to any case, check if it should create or link to case
     if mod_in.decision == ReportModerationStatus.APPROVED and not report.case_id:
-        case_count = db.query(Case).count() + 1
-        case_public_id = f"CAS-2026-{case_count:04d}"
+        case_public_id = allocate_case_public_id(db)
 
         score, band, breakdown = PriorityEngine.calculate_priority(
             category_weight=report.category.default_severity_weight,
@@ -298,8 +296,7 @@ def decide_duplicate(
         # If report is still unlinked, promote to independent case
         report = candidate.report
         if not report.case_id:
-            case_count = db.query(Case).count() + 1
-            case_public_id = f"CAS-2026-{case_count:04d}"
+            case_public_id = allocate_case_public_id(db)
             
             score, band, breakdown = PriorityEngine.calculate_priority(
                 category_weight=report.category.default_severity_weight,
