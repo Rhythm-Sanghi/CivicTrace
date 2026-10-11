@@ -155,6 +155,12 @@ class ExportService:
                 if len(file_list) != len(set(file_list)):
                     return False, ["TAMPER DETECTED: Duplicate file entries detected in export package."]
 
+                # Security: Decompression bomb limit guard (maximum 50MB uncompressed)
+                MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
+                total_uncompressed = sum(info.file_size for info in zf.infolist())
+                if total_uncompressed > MAX_UNCOMPRESSED_BYTES:
+                    return False, ["SECURITY VULNERABILITY: Archive exceeds maximum uncompressed size limit."]
+
                 # Security: Zip Slip / Path Traversal Guard
                 for member in file_list:
                     if ".." in member or member.startswith("/") or member.startswith("\\"):
@@ -165,6 +171,12 @@ class ExportService:
 
                 manifest_data = json.loads(zf.read("manifest.json").decode("utf-8"))
                 expected_files = manifest_data.get("files", {})
+
+                # Security: Reject undeclared extra files in export package
+                declared_set = set(expected_files.keys()) | {"manifest.json"}
+                extra_files = set(file_list) - declared_set
+                if extra_files:
+                    return False, [f"TAMPER DETECTED: Undeclared file(s) found in archive: {', '.join(sorted(extra_files))}"]
 
                 for fname, meta in expected_files.items():
                     if ".." in fname or fname.startswith("/") or fname.startswith("\\"):

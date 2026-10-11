@@ -1,10 +1,12 @@
 from typing import List, Optional
 from datetime import datetime, timezone
 import os
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.db.session import get_db
+from app.core.config import settings
+from app.core.rate_limiter import check_rate_limit
 from app.models.entities import (
     Case,
     Report,
@@ -340,7 +342,13 @@ def list_case_verifications(case_id: str, db: Session = Depends(get_db)):
     return db.query(VerificationObservation).filter(VerificationObservation.case_id == case.id).all()
 
 @router.get("/{case_id}/export")
-def export_case_evidence(case_id: str, db: Session = Depends(get_db)):
+def export_case_evidence(case_id: str, request: Request, db: Session = Depends(get_db)):
+    check_rate_limit(
+        request,
+        max_requests=settings.RATE_LIMIT_EXPORT_MAX,
+        window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+        action_key="export_package"
+    )
     case = db.query(Case).filter((Case.id == case_id) | (Case.public_id == case_id)).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")

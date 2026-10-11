@@ -352,11 +352,18 @@ ALLOWED_EVIDENCE_MIME_TYPES = {
 @router.post("/{report_id}/evidence", response_model=EvidenceAssetPublic, status_code=status.HTTP_201_CREATED)
 async def upload_report_evidence(
     report_id: str,
+    request: Request,
     file: UploadFile = File(...),
     caption: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
+    check_rate_limit(
+        request,
+        max_requests=settings.RATE_LIMIT_UPLOAD_MAX,
+        window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+        action_key="upload_evidence",
+    )
     report = db.query(Report).filter((Report.id == report_id) | (Report.public_id == report_id)).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -466,6 +473,12 @@ def download_evidence_asset(
     asset = db.query(EvidenceAsset).filter(EvidenceAsset.id == asset_id).first()
     if not asset or not os.path.exists(asset.file_path):
         raise HTTPException(status_code=404, detail="Evidence asset not found on disk")
+
+    # Path traversal confinement guard: ensure asset file lives inside configured upload directory
+    real_path = os.path.realpath(asset.file_path)
+    real_upload_dir = os.path.realpath(settings.UPLOAD_DIR)
+    if not real_path.startswith(real_upload_dir):
+        raise HTTPException(status_code=403, detail="Access denied: file outside storage boundary")
 
     # Access control: If asset is not marked public OR parent report is pending/unapproved,
     # public/unauthenticated access is denied; caller must be original reporter or reviewer/admin.

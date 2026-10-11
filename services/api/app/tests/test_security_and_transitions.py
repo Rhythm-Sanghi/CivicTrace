@@ -1,3 +1,4 @@
+import os
 import pytest
 from app.models.entities import User, UserRole, Report, Case, IssueCategory
 from app.api.v1.endpoints.reports import validate_magic_bytes
@@ -184,3 +185,140 @@ def test_unapproved_evidence_download_protection(client, db_session):
     # Clean up test file
     if os.path.exists(test_file_path):
         os.remove(test_file_path)
+
+
+def test_password_length_protection(client):
+    from app.core.security import verify_password, get_password_hash
+
+    long_pw = "A" * 75
+    # Direct hash attempt should raise ValueError
+    with pytest.raises(ValueError) as exc_info:
+        get_password_hash(long_pw)
+    assert "exceeds maximum allowed length of 72 bytes" in str(exc_info.value)
+
+    # Direct verify attempt should return False
+    assert verify_password(long_pw, "$2b$12$dummyhash") is False
+
+    # Registration endpoint rejects > 72 bytes
+    resp = client.post(
+        "/api/v1/auth/register",
+        json={"email": "longpw@civictrace.local", "display_name": "Long", "password": long_pw},
+    )
+    assert resp.status_code == 400
+    assert "exceeds maximum allowed length of 72 bytes" in resp.json()["detail"]
+
+
+def test_session_cookie_login_and_logout(client, db_session):
+    from app.core.security import get_password_hash
+
+    user = User(
+        email="cookie_session@civictrace.local",
+        hashed_password=get_password_hash("CookiePass2026!"),
+        display_name="Cookie User",
+        role=UserRole.CITIZEN,
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    # 1. Login sets HttpOnly access_token cookie
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        data={"username": user.email, "password": "CookiePass2026!"},
+    )
+    assert login_resp.status_code == 200
+    assert "access_token" in login_resp.cookies
+
+    # 2. Access /auth/me using only the session cookie (no Authorization header)
+    me_resp = client.get("/api/v1/auth/me", cookies=login_resp.cookies)
+    assert me_resp.status_code == 200
+    assert me_resp.json()["email"] == user.email
+
+    # 3. Calling /auth/logout clears the session cookie
+    logout_resp = client.post("/api/v1/auth/logout", cookies=login_resp.cookies)
+    assert logout_resp.status_code == 200
+    assert logout_resp.json()["message"] == "Successfully signed out."
+
+
+def test_deterministic_rate_limiter_without_sleep():
+    reset_rate_limits()
+
+    class DummyClient:
+        host = "10.0.0.99"
+
+    class DummyRequest:
+        client = DummyClient()
+        headers = {}
+
+    req = DummyRequest()
+    base_time = 1000.0
+
+    # 3 requests at base_time should pass with max=3, window=60
+    for _ in range(3):
+        check_rate_limit(req, max_requests=3, window_seconds=60, action_key="fast_test", current_time=base_time)
+
+    # 4th request at same timestamp must be blocked with 429
+    with pytest.raises(HTTPException) as exc:
+        check_rate_limit(req, max_requests=3, window_seconds=60, action_key="fast_test", current_time=base_time)
+    assert exc.value.status_code == 429
+    assert "Retry-After" in exc.value.headers
+
+    # Advance time past the 60-second window (base_time + 61s): request must now succeed deterministically!
+    check_rate_limit(req, max_requests=3, window_seconds=60, action_key="fast_test", current_time=base_time + 61.0)
+
+
+def test_reverse_proxy_ip_trust_guard():
+    from app.core.rate_limiter import get_client_ip
+
+    class DummyClient:
+        host = "198.51.100.1"
+
+    class SpoofedRequest:
+        client = DummyClient()
+        headers = {"X-Forwarded-For": "203.0.113.195, 10.0.0.1"}
+
+    req = SpoofedRequest()
+    # By default, BEHIND_PROXY is False, so client.host is used directly and untrusted headers are ignored
+    resolved_ip = get_client_ip(req)
+    assert resolved_ip == "198.51.100.1"
+
+
+def test_export_package_extra_file_detection(db_session):
+    import zipfile
+    from app.services.export_service import ExportService
+
+    cat = IssueCategory(name="Export Extra Test", code="EET01", default_severity_weight=1.0)
+    case = Case(
+        public_id="TEST-EXP-EXTRA",
+        category=cat,
+        title="Extra File Detection Test",
+        description="Testing detection of undeclared package contents",
+        latitude=22.7,
+        longitude=75.8,
+        state=CaseState.SUBMITTED,
+    )
+    db_session.add_all([cat, case])
+    db_session.commit()
+
+    # Generate legitimate export package
+    zip_path = ExportService.generate_case_export_package(db_session, case.id)
+    is_valid, _ = ExportService.verify_export_package(zip_path)
+    assert is_valid is True
+
+    # Inject an undeclared extra payload file into the zip
+    tampered_zip = zip_path.replace(".zip", "_tampered.zip")
+    with zipfile.ZipFile(zip_path, "r") as z_in:
+        with zipfile.ZipFile(tampered_zip, "w") as z_out:
+            for item in z_in.infolist():
+                z_out.writestr(item, z_in.read(item.filename))
+            z_out.writestr("undeclared_payload.sh", b"#!/bin/bash\necho dangerous")
+
+    # Verify that the standalone verifier detects the extra undeclared file!
+    tamper_valid, logs = ExportService.verify_export_package(tampered_zip)
+    assert tamper_valid is False
+    assert any("Undeclared file(s) found in archive" in log for log in logs)
+
+    # Clean up test files
+    for p in [zip_path, tampered_zip]:
+        if os.path.exists(p):
+            os.remove(p)

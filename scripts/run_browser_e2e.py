@@ -45,8 +45,8 @@ def run_real_e2e_lifecycle():
 
         # Step 2: Citizen Submits a New Infrastructure Defect
         print("\n[Step 2/14] Citizen reports defect with location and details...")
-        page.click("text=Report Issue")
-        page.wait_for_selector("text=Report an Infrastructure Defect", timeout=10000)
+        page.goto(f"{WEB_BASE}/report")
+        page.wait_for_selector("text=Report issue", timeout=10000)
         
         run_id = int(time.time())
         defect_title = f"Hazardous Exposed Cable Conduit near Chhatri Bagh Junction #{run_id}"
@@ -55,7 +55,7 @@ def run_real_e2e_lifecycle():
         page.fill("input[placeholder*='e.g. Deep pothole']", defect_title)
         page.fill("textarea[placeholder*='Detail what you observed']", defect_desc)
         page.fill("input[placeholder*='Near Rajwada Palace']", "Chhatri Bagh Main Road, Indore")
-        page.click("button[type='submit']")
+        page.click("button:has-text('Submit public defect observation')")
         
         page.wait_for_selector("text=Observation Successfully Registered", timeout=10000)
         print("  [OK] Complaint successfully registered in backend database.")

@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 import jwt
 from sqlalchemy.orm import Session
@@ -10,9 +10,14 @@ from app.models.entities import User, UserRole
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login", auto_error=False)
 
 def get_current_user_optional(
+    request: Request,
     token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
+    # Check Authorization Bearer header first; fallback to HttpOnly session cookie
+    if not token and request:
+        token = request.cookies.get("access_token")
+
     if not token:
         return None
     try:

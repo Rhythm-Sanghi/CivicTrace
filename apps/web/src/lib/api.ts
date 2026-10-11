@@ -105,6 +105,8 @@ export function setAuthToken(token: string) {
 export function clearAuthToken() {
   localStorage.removeItem("civictrace_token");
   localStorage.removeItem("civictrace_user");
+  // Notify backend to clear HttpOnly session cookie
+  fetch(`${API_BASE}/auth/logout`, { method: "POST", credentials: "include" }).catch(() => {});
 }
 
 export function getCurrentUser(): User | null {
@@ -128,10 +130,14 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
+    credentials: "include",
     headers,
   });
 
   if (!res.ok) {
+    if (res.status === 401) {
+      clearAuthToken();
+    }
     const errorBody = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(errorBody.detail || "Request failed");
   }

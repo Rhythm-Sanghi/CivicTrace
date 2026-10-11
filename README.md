@@ -107,7 +107,7 @@ cd services/api
 python -m pytest app/tests/ -v
 ```
 
-**16/16 tests pass**, covering:
+**21/21 tests pass**, covering:
 1. Append-only SHA-256 hash chain verification and mathematical tamper detection
 2. Deterministic Haversine spatial correlation and priority calculation
 3. Conflict of interest enforcement: operators strictly blocked from self-verifying resolution claims (`403 Forbidden`)
@@ -115,15 +115,20 @@ python -m pytest app/tests/ -v
 5. Contradictory dispute protection: any citizen dispute (`STILL_UNRESOLVED`) immediately forces case state into `DISPUTED`
 6. Claim cycle scoping: stale verification observations on prior disputed repair claims do not leak into new claim cycles after rework; citizens can re-verify new claims
 7. Evidence authorization gating: unapproved or pending evidence cannot be downloaded publicly by anonymous callers or third-party citizens; approval required for public distribution
-8. Unauthorized state transition prevention via centralized `CaseStateMachine`
-9. Collision-resistant monotonic sequential public identifier allocators (`RPT-2026-XXXX`, `CAS-2026-XXXX`)
-10. In-memory sliding-window IP rate limiting on authentication and reporting endpoints
-11. Strict file magic bytes inspection (JPEG, PNG, WEBP, PDF) and 10MB streaming size validation
-12. Full lifecycle end-to-end integration flow
-13. ZIP export evidence manifest hashing and Zip-Slip traversal protection
-14. Duplicate zip entry rejection preventing archive ambiguity attacks
-15. Priority band engine mappings and critical hazard escalations
-16. Health check probe and service status reporting
+8. Path traversal confinement preventing filesystem escape outside upload storage directory
+9. Unauthorized state transition prevention via centralized `CaseStateMachine`
+10. Collision-resistant monotonic sequential public identifier allocators (`RPT-2026-XXXX`, `CAS-2026-XXXX`)
+11. In-memory sliding-window IP rate limiting with thread safety, prune intervals, and deterministic test clock
+12. Reverse proxy header trust guard: `X-Forwarded-For` ignored unless `BEHIND_PROXY` is enabled and request originates from a trusted peer
+13. Strict file magic bytes inspection (JPEG, PNG, WEBP, PDF) and 10MB streaming size validation
+14. Full lifecycle end-to-end integration flow
+15. ZIP export evidence manifest hashing and Zip-Slip traversal protection
+16. Duplicate zip entry rejection preventing archive ambiguity attacks
+17. Undeclared zip file payload rejection and decompression bomb limit guards (50MB)
+18. Hard bcrypt 72-byte password length validation preventing silent password truncation
+19. Constant-time dummy password hashing on authentication failures preventing account enumeration timing attacks
+20. HttpOnly cookie session support with explicit `/auth/logout` revocation
+21. Health check probe and service status reporting
 
 ### Frontend Component Tests (Vitest)
 ```bash
@@ -147,7 +152,8 @@ python scripts/verify_evidence.py storage/exports/<package_name>.zip
 
 ## ⚙️ Architecture & Production Operational Notes
 
-- **Rate Limiting Scope:** The built-in rate limiter utilizes an in-memory sliding window keyed by client IP. In single-process development and standard evaluation servers, it prevents basic spam and flooding with zero external dependencies. For distributed, multi-worker (e.g. Uvicorn clusters) or multi-container horizontal deployments, replace the in-memory store with a Redis / Valkey-backed sliding-window counter.
+- **Database Engine Support:** SQLite is the default zero-dependency database for local development and offline testing. Production environments support PostgreSQL with PostGIS for native spatial indexes; note that PostgreSQL/PostGIS is unverified in this offline testing environment and requires running migrations (`alembic upgrade head`) against a live Postgres instance before production deployment.
+- **Rate Limiting Scope:** The built-in rate limiter utilizes an in-memory sliding window protected by thread locks and periodic memory pruning. In single-process development and standard evaluation servers, it prevents basic spam and flooding with zero external dependencies. For distributed, multi-worker (e.g. Uvicorn clusters) or multi-container horizontal deployments, replace the in-memory store with a Redis / Valkey-backed sliding-window counter.
 - **Cryptographic Ledger vs Digital Signatures:** CivicTrace provides tamper-evident append-only auditability via deterministic SHA-256 hash-chaining of canonical JSON payloads. This guarantees mathematical tamper detection and timeline ordering, but is distinct from PKI digital signatures.
 - **Geographic Model:** CivicTrace uses an offline schematic map model with synthetic municipal defect data situated in Indore Ward 34. It does not connect to commercial mapping APIs or transmit user location externally.
 

@@ -24,12 +24,22 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: Union[List[str], str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
-    # Schema management: Set to True for zero-dependency local demo/development; in production, use Alembic migrations
-    AUTO_CREATE_TABLES: bool = True
+    # Schema management: Default False (Alembic migrations are authoritative). Set True in .env for local demo zero-setup
+    AUTO_CREATE_TABLES: bool = False
 
     # Resolution Verification Policy Constants
     # Minimum required confirmations from distinct identities to automatically resolve an uncontested claim
     CONFIRMATIONS_REQUIRED_FOR_AUTO_RESOLVE: int = 2
+
+    # Rate Limiting & Proxy Configuration
+    BEHIND_PROXY: bool = False
+    TRUSTED_PROXIES: List[str] = ["127.0.0.1", "::1"]
+    RATE_LIMIT_LOGIN_MAX: int = 20
+    RATE_LIMIT_REGISTER_MAX: int = 10
+    RATE_LIMIT_REPORT_MAX: int = 30
+    RATE_LIMIT_UPLOAD_MAX: int = 15
+    RATE_LIMIT_EXPORT_MAX: int = 10
+    RATE_LIMIT_WINDOW_SECONDS: int = 60
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
