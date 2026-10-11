@@ -1,4 +1,5 @@
 from typing import Optional
+from urllib.parse import urlparse
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 import jwt
@@ -12,7 +13,7 @@ from app.models.entities import User, UserRole
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login", auto_error=False)
 
 def _validate_csrf_if_cookie_auth(request: Request, is_cookie_auth: bool) -> None:
-    """Enforces Double-Submit Cookie CSRF protection for cookie-authenticated mutating requests."""
+    """Enforces Double-Submit Cookie CSRF protection and Origin verification for cookie-authenticated mutating requests."""
     if not is_cookie_auth or not request:
         return
 
@@ -25,6 +26,36 @@ def _validate_csrf_if_cookie_auth(request: Request, is_cookie_auth: bool) -> Non
     if path.endswith("/auth/login") or path.endswith("/auth/register"):
         return
 
+    # 1. Origin / Referer validation against trusted hosts and CORS origins
+    origin = request.headers.get("origin")
+    referer = request.headers.get("referer")
+    allowed_origins = set(settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS])
+
+    # Also dynamically allow the server's own request host origin
+    host_header = request.headers.get("host")
+    if host_header:
+        # Include http and https schemes for self-origin
+        allowed_origins.add(f"http://{host_header}")
+        allowed_origins.add(f"https://{host_header}")
+
+    # If Origin header is present, it must be in the trusted origins
+    if origin:
+        if origin not in allowed_origins and "*" not in allowed_origins:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"CSRF verification failed: untrusted origin '{origin}'"
+            )
+    elif referer:
+        # Parse referer URL to match origin scheme://netloc
+        parsed_ref = urlparse(referer)
+        ref_origin = f"{parsed_ref.scheme}://{parsed_ref.netloc}"
+        if ref_origin not in allowed_origins and "*" not in allowed_origins:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"CSRF verification failed: untrusted referer '{ref_origin}'"
+            )
+
+    # 2. Double-Submit Token verification
     csrf_cookie = request.cookies.get(settings.CSRF_COOKIE_NAME)
     csrf_header = request.headers.get(settings.CSRF_HEADER_NAME)
 

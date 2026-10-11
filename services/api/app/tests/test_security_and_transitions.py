@@ -260,6 +260,79 @@ def test_session_cookie_login_and_logout(client, db_session):
     assert me_after_logout.status_code == 401
 
 
+def test_login_never_leaks_token_via_accept_headers(client, db_session):
+    from app.core.security import get_password_hash
+
+    user = User(
+        email="no_token_leak@civictrace.local",
+        hashed_password=get_password_hash("NoLeakPass2026!"),
+        display_name="Safe User",
+        role=UserRole.CITIZEN,
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    # Even with diverse or wildcard Accept headers, token is NEVER returned without explicit param
+    for accept_header in ["*/*", "text/html", "application/json", "application/x-www-form-urlencoded"]:
+        resp = client.post(
+            "/api/v1/auth/login",
+            data={"username": user.email, "password": "NoLeakPass2026!"},
+            headers={"Accept": accept_header},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["access_token"] is None
+        assert body["token_type"] == "cookie"
+
+
+def test_csrf_origin_and_referer_validation(client, db_session):
+    from app.core.security import get_password_hash
+
+    user = User(
+        email="csrf_origin_user@civictrace.local",
+        hashed_password=get_password_hash("CsrfPass2026!"),
+        display_name="Origin User",
+        role=UserRole.CITIZEN,
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        data={"username": user.email, "password": "CsrfPass2026!"},
+    )
+    csrf_token = login_resp.cookies.get("csrf_token")
+    cookies = login_resp.cookies
+
+    # 1. Untrusted Origin header is rejected
+    bad_origin_resp = client.post(
+        "/api/v1/auth/logout",
+        cookies=cookies,
+        headers={"X-CSRF-Token": csrf_token, "Origin": "https://malicious-civic-phishing.com"},
+    )
+    assert bad_origin_resp.status_code == 403
+    assert "untrusted origin" in bad_origin_resp.json()["detail"]
+
+    # 2. Untrusted Referer header is rejected
+    bad_ref_resp = client.post(
+        "/api/v1/auth/logout",
+        cookies=cookies,
+        headers={"X-CSRF-Token": csrf_token, "Referer": "https://evil-site.org/attack-page"},
+    )
+    assert bad_ref_resp.status_code == 403
+    assert "untrusted referer" in bad_ref_resp.json()["detail"]
+
+    # 3. Trusted Origin from allowed CORS origins succeeds
+    good_origin_resp = client.post(
+        "/api/v1/auth/logout",
+        cookies=cookies,
+        headers={"X-CSRF-Token": csrf_token, "Origin": "http://localhost:5173"},
+    )
+    assert good_origin_resp.status_code == 200
+
+
 def test_cli_bearer_token_login_and_csrf_bypass(client, db_session):
     from app.core.security import get_password_hash
 
@@ -283,6 +356,14 @@ def test_cli_bearer_token_login_and_csrf_bypass(client, db_session):
     token = data["access_token"]
     assert token is not None
     assert data["token_type"] == "bearer"
+
+    # Also test format=token parameter
+    login_format_resp = client.post(
+        "/api/v1/auth/login?format=token",
+        data={"username": user.email, "password": "CliPass2026!"},
+    )
+    assert login_format_resp.status_code == 200
+    assert login_format_resp.json()["access_token"] is not None
 
     # Bearer token authenticated mutating request does NOT require CSRF token
     logout_resp = client.post(

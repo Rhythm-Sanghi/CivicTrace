@@ -118,9 +118,10 @@ def login(
         path="/",
     )
 
-    # Check whether client explicitly requested bearer token output via query param or header (for CLI/scripts)
-    # By default in browser cookie flows, access_token is NOT exposed to client-side JavaScript.
-    include_token = request.query_params.get("include_token") == "true" or "application/json" not in request.headers.get("accept", "")
+    # Check whether client explicitly requested bearer token output via query param (for CLI/scripts).
+    # By default in browser cookie flows, access_token is NEVER exposed to client-side JavaScript.
+    # Accept header inference has been removed: bearer delivery strictly requires an explicit parameter.
+    include_token = request.query_params.get("include_token") == "true" or request.query_params.get("format") == "token"
 
     return {
         "access_token": access_token if include_token else None,

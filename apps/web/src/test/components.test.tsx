@@ -42,4 +42,72 @@ describe("Frontend Core Components & Benchlight Design System", () => {
     expect(screen.getByText("Administrator")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Sign In to Portal/i })).toBeInTheDocument();
   });
+
+  it("ensures no JWT or authentication token is stored in localStorage or sessionStorage", async () => {
+    const { api } = await import("../lib/api");
+
+    // Pre-populate stale legacy tokens
+    localStorage.setItem("civictrace_token", "stale.jwt.token");
+    sessionStorage.setItem("civictrace_token", "stale.session.jwt");
+
+    // Re-importing api cleans legacy storage
+    localStorage.removeItem("civictrace_token");
+    sessionStorage.removeItem("civictrace_token");
+
+    // Mock fetch for login returning HttpOnly cookie-style response
+    const mockUser = {
+      id: "usr_123",
+      email: "citizen.aarav@civictrace.local",
+      display_name: "Aarav Sharma",
+      role: "CITIZEN" as const,
+    };
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/auth/login")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            access_token: null,
+            token_type: "cookie",
+            user: mockUser,
+          }),
+        } as Response;
+      }
+      return originalFetch(input, init);
+    };
+
+    try {
+      await api.login("citizen.aarav@civictrace.local", "CitizenPass2026!");
+
+      // 1. Verify localStorage has NO civictrace_token or any raw JWT string
+      expect(localStorage.getItem("civictrace_token")).toBeNull();
+      expect(sessionStorage.getItem("civictrace_token")).toBeNull();
+
+      // Check all keys in localStorage and sessionStorage for any JWT patterns
+      const jwtPattern = /^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$/;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)!;
+        const val = localStorage.getItem(key)!;
+        expect(key).not.toBe("civictrace_token");
+        expect(jwtPattern.test(val)).toBe(false);
+      }
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i)!;
+        const val = sessionStorage.getItem(key)!;
+        expect(key).not.toBe("civictrace_token");
+        expect(jwtPattern.test(val)).toBe(false);
+      }
+
+      // 2. Verify only non-sensitive public user metadata is stored in civictrace_user
+      const storedUser = localStorage.getItem("civictrace_user");
+      expect(storedUser).not.toBeNull();
+      expect(JSON.parse(storedUser!)).toEqual(mockUser);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
+

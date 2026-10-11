@@ -8,12 +8,20 @@ import jwt
 import bcrypt
 from app.core.config import settings
 
-# Thread-safe in-memory session revocation store (token_signature -> expiration_timestamp)
+# In-memory session revocation store (token_hash -> expiration_timestamp)
+# ARCHITECTURAL NOTE: This revocation store operates strictly within a single server process.
+# It is designed for lightweight single-node and local deployments. It does NOT provide cluster-wide
+# multi-process synchronization across multiple workers or persistence across process restarts.
+# In a distributed multi-worker production cluster, a distributed backing store (such as Redis)
+# or short-lived tokens with asymmetric key rotation must be configured.
 _revoked_tokens_lock = threading.Lock()
 _revoked_tokens: Dict[str, float] = {}
 
 def revoke_token(token: str, expires_at: Optional[float] = None) -> None:
-    """Revokes a JWT token so it cannot be reused even prior to standard expiration."""
+    """Revokes a JWT token within the local process so it cannot be reused prior to standard expiration.
+
+    LIMITATION: Single-process in-memory store only. Does not persist across server restarts or sync across clusters.
+    """
     try:
         # Extract expiration if not passed directly
         if expires_at is None:
