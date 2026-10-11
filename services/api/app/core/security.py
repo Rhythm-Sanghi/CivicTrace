@@ -1,10 +1,63 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Union, Any
+from typing import Optional, Union, Any, Dict
 import hashlib
 import json
+import secrets
+import threading
 import jwt
 import bcrypt
 from app.core.config import settings
+
+# Thread-safe in-memory session revocation store (token_signature -> expiration_timestamp)
+_revoked_tokens_lock = threading.Lock()
+_revoked_tokens: Dict[str, float] = {}
+
+def revoke_token(token: str, expires_at: Optional[float] = None) -> None:
+    """Revokes a JWT token so it cannot be reused even prior to standard expiration."""
+    try:
+        # Extract expiration if not passed directly
+        if expires_at is None:
+            unverified_payload = jwt.decode(token, options={"verify_signature": False})
+            expires_at = float(unverified_payload.get("exp", datetime.now(timezone.utc).timestamp() + 86400))
+
+        # Token key: sha256 hash of token to save memory and avoid storing raw token
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        now = datetime.now(timezone.utc).timestamp()
+
+        with _revoked_tokens_lock:
+            # Purge expired entries to prevent unbounded memory growth
+            expired_keys = [k for k, exp in _revoked_tokens.items() if exp <= now]
+            for k in expired_keys:
+                del _revoked_tokens[k]
+            _revoked_tokens[token_hash] = expires_at
+    except Exception:
+        # Fallback hash storage for malformed tokens
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        with _revoked_tokens_lock:
+            _revoked_tokens[token_hash] = datetime.now(timezone.utc).timestamp() + 86400
+
+def is_token_revoked(token: str) -> bool:
+    """Checks if a given JWT token has been placed on the revocation blocklist."""
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    now = datetime.now(timezone.utc).timestamp()
+    with _revoked_tokens_lock:
+        exp = _revoked_tokens.get(token_hash)
+        if exp is None:
+            return False
+        if exp <= now:
+            del _revoked_tokens[token_hash]
+            return False
+        return True
+
+def reset_revoked_tokens_for_tests() -> None:
+    """Resets the revoked token store for isolated test suites."""
+    with _revoked_tokens_lock:
+        _revoked_tokens.clear()
+
+def generate_csrf_token() -> str:
+    """Generates a cryptographically secure random token for Double Submit CSRF defense."""
+    return secrets.token_urlsafe(32)
+
 
 # Precomputed bcrypt hash of a random token to maintain constant-time login responses
 # and prevent timing-based user enumeration attacks.

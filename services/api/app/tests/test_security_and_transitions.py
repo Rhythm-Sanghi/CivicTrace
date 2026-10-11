@@ -221,23 +221,80 @@ def test_session_cookie_login_and_logout(client, db_session):
     db_session.add(user)
     db_session.commit()
 
-    # 1. Login sets HttpOnly access_token cookie
+    # 1. Login sets HttpOnly access_token cookie and readable csrf_token cookie
     login_resp = client.post(
         "/api/v1/auth/login",
         data={"username": user.email, "password": "CookiePass2026!"},
+        headers={"Accept": "application/json"},
     )
     assert login_resp.status_code == 200
     assert "access_token" in login_resp.cookies
+    assert "csrf_token" in login_resp.cookies
+    # In browser cookie mode, access_token is NOT exposed in the JSON body
+    assert login_resp.json()["access_token"] is None
+    assert login_resp.json()["token_type"] == "cookie"
+
+    csrf_val = login_resp.cookies.get("csrf_token")
 
     # 2. Access /auth/me using only the session cookie (no Authorization header)
     me_resp = client.get("/api/v1/auth/me", cookies=login_resp.cookies)
     assert me_resp.status_code == 200
     assert me_resp.json()["email"] == user.email
 
-    # 3. Calling /auth/logout clears the session cookie
-    logout_resp = client.post("/api/v1/auth/logout", cookies=login_resp.cookies)
+    # 3. Cookie-authenticated mutating request without CSRF header is rejected with 403
+    csrf_fail_resp = client.post("/api/v1/auth/logout", cookies=login_resp.cookies)
+    assert csrf_fail_resp.status_code == 403
+    assert "CSRF verification failed" in csrf_fail_resp.json()["detail"]
+
+    # 4. Calling /auth/logout with CSRF header succeeds and clears cookies
+    logout_resp = client.post(
+        "/api/v1/auth/logout",
+        cookies=login_resp.cookies,
+        headers={"X-CSRF-Token": csrf_val},
+    )
     assert logout_resp.status_code == 200
     assert logout_resp.json()["message"] == "Successfully signed out."
+
+    # 5. Token revocation test: Replaying the old session cookie is now rejected
+    me_after_logout = client.get("/api/v1/auth/me", cookies=login_resp.cookies)
+    assert me_after_logout.status_code == 401
+
+
+def test_cli_bearer_token_login_and_csrf_bypass(client, db_session):
+    from app.core.security import get_password_hash
+
+    user = User(
+        email="cli_user@civictrace.local",
+        hashed_password=get_password_hash("CliPass2026!"),
+        display_name="CLI User",
+        role=UserRole.CITIZEN,
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    # CLI/script requesting explicit token via include_token=true
+    login_resp = client.post(
+        "/api/v1/auth/login?include_token=true",
+        data={"username": user.email, "password": "CliPass2026!"},
+    )
+    assert login_resp.status_code == 200
+    data = login_resp.json()
+    token = data["access_token"]
+    assert token is not None
+    assert data["token_type"] == "bearer"
+
+    # Bearer token authenticated mutating request does NOT require CSRF token
+    logout_resp = client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert logout_resp.status_code == 200
+
+    # Token is now revoked
+    me_resp = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me_resp.status_code == 401
+
 
 
 def test_deterministic_rate_limiter_without_sleep():

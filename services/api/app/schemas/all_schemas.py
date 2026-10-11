@@ -33,8 +33,8 @@ class UserPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class Token(BaseModel):
-    access_token: str
-    token_type: str
+    access_token: Optional[str] = None
+    token_type: str = "bearer"
     user: UserPublic
 
 # Category schemas

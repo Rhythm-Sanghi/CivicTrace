@@ -5,7 +5,14 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.entities import User, UserRole
 from app.schemas.all_schemas import UserCreate, UserPublic, Token
-from app.core.security import verify_password, verify_dummy_password, get_password_hash, create_access_token
+from app.core.security import (
+    verify_password,
+    verify_dummy_password,
+    get_password_hash,
+    create_access_token,
+    generate_csrf_token,
+    revoke_token,
+)
 from app.core.rate_limiter import check_rate_limit
 from app.core.config import settings
 from app.api.deps import get_current_user, get_current_user_optional
@@ -87,6 +94,7 @@ def login(
         )
 
     access_token = create_access_token(subject=user.id)
+    csrf_token = generate_csrf_token()
 
     # Set secure HttpOnly session cookie
     response.set_cookie(
@@ -96,18 +104,50 @@ def login(
         samesite="lax",
         secure=(settings.ENVIRONMENT.lower() == "production"),
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
     )
 
+    # Set readable CSRF cookie for Double-Submit pattern (non-HttpOnly so client JS can read and send in header)
+    response.set_cookie(
+        key=settings.CSRF_COOKIE_NAME,
+        value=csrf_token,
+        httponly=False,
+        samesite="lax",
+        secure=(settings.ENVIRONMENT.lower() == "production"),
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+
+    # Check whether client explicitly requested bearer token output via query param or header (for CLI/scripts)
+    # By default in browser cookie flows, access_token is NOT exposed to client-side JavaScript.
+    include_token = request.query_params.get("include_token") == "true" or "application/json" not in request.headers.get("accept", "")
+
     return {
-        "access_token": access_token,
-        "token_type": "bearer",
+        "access_token": access_token if include_token else None,
+        "token_type": "bearer" if include_token else "cookie",
         "user": user
     }
 
 @router.post("/logout")
-def logout(response: Response, current_user: Optional[User] = Depends(get_current_user_optional)):
-    """Terminates session by clearing HttpOnly authentication cookie."""
+def logout(
+    request: Request,
+    response: Response,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Terminates session by revoking the active token and clearing cookies."""
+    # Revoke the session token (from Authorization header or access_token cookie)
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+    if not token:
+        token = request.cookies.get("access_token")
+
+    if token:
+        revoke_token(token)
+
     response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key=settings.CSRF_COOKIE_NAME, path="/")
     return {"message": "Successfully signed out."}
 
 @router.get("/me", response_model=UserPublic)

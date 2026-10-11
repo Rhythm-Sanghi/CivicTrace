@@ -94,38 +94,72 @@ export interface NeighborhoodStats {
   priority_counts: Record<string, number>;
 }
 
-export function getAuthToken(): string | null {
-  return localStorage.getItem("civictrace_token");
+// Proactively eradicate any legacy tokens left in localStorage/sessionStorage by older CivicTrace versions
+try {
+  localStorage.removeItem("civictrace_token");
+  sessionStorage.removeItem("civictrace_token");
+} catch {
+  // Graceful fallback for non-browser or restricted storage contexts
 }
 
-export function setAuthToken(token: string) {
-  localStorage.setItem("civictrace_token", token);
+/**
+ * Extracts a cookie value by name from document.cookie in the browser.
+ */
+export function getCsrfToken(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp("(^|;\\s*)csrf_token=([^;]*)"));
+  return match ? decodeURIComponent(match[2]) : null;
 }
 
 export function clearAuthToken() {
-  localStorage.removeItem("civictrace_token");
-  localStorage.removeItem("civictrace_user");
-  // Notify backend to clear HttpOnly session cookie
-  fetch(`${API_BASE}/auth/logout`, { method: "POST", credentials: "include" }).catch(() => {});
+  try {
+    localStorage.removeItem("civictrace_token");
+    sessionStorage.removeItem("civictrace_token");
+    localStorage.removeItem("civictrace_user");
+  } catch {}
+  
+  // Send CSRF token with logout request
+  const csrfToken = getCsrfToken();
+  const headers: Record<string, string> = {};
+  if (csrfToken) {
+    headers["X-CSRF-Token"] = csrfToken;
+  }
+  
+  fetch(`${API_BASE}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+    headers,
+  }).catch(() => {});
 }
 
 export function getCurrentUser(): User | null {
-  const u = localStorage.getItem("civictrace_user");
-  return u ? JSON.parse(u) : null;
+  try {
+    const u = localStorage.getItem("civictrace_user");
+    return u ? JSON.parse(u) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function setCurrentUser(user: User) {
-  localStorage.setItem("civictrace_user", JSON.stringify(user));
+  try {
+    localStorage.setItem("civictrace_user", JSON.stringify(user));
+  } catch {}
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+  const method = (options.method || "GET").toUpperCase();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+
+  // Attach Double-Submit CSRF token header on mutating requests (POST, PUT, PATCH, DELETE)
+  if (method !== "GET" && method !== "HEAD") {
+    const csrf = getCsrfToken();
+    if (csrf) {
+      headers["X-CSRF-Token"] = csrf;
+    }
   }
 
   const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -169,16 +203,19 @@ export const api = {
     }),
 
   uploadEvidence: async (reportId: string, file: File, caption?: string) => {
-    const token = getAuthToken();
     const formData = new FormData();
     formData.append("file", file);
     if (caption) formData.append("caption", caption);
 
     const headers: Record<string, string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const csrf = getCsrfToken();
+    if (csrf) {
+      headers["X-CSRF-Token"] = csrf;
+    }
 
     const res = await fetch(`${API_BASE}/reports/${reportId}/evidence`, {
       method: "POST",
+      credentials: "include",
       headers,
       body: formData,
     });
@@ -233,6 +270,7 @@ export const api = {
     formData.append("password", pass);
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: formData.toString(),
     });
@@ -241,8 +279,11 @@ export const api = {
       throw new Error(err.detail);
     }
     const data = await res.json();
-    setAuthToken(data.access_token);
-    setCurrentUser(data.user);
+    // In cookie-authenticated architecture, token is HttpOnly.
+    // We only preserve public user profile in local storage for instant layout hydration.
+    if (data.user) {
+      setCurrentUser(data.user);
+    }
     return data;
   },
 

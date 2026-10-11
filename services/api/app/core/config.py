@@ -24,6 +24,10 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: Union[List[str], str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+    # CSRF Protection settings
+    CSRF_COOKIE_NAME: str = "csrf_token"
+    CSRF_HEADER_NAME: str = "X-CSRF-Token"
+
     # Schema management: Default False (Alembic migrations are authoritative). Set True in .env for local demo zero-setup
     AUTO_CREATE_TABLES: bool = False
 

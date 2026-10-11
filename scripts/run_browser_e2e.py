@@ -94,7 +94,7 @@ def run_real_e2e_lifecycle():
 
         # Step 5: Duplicate Engine calculates candidate recommendation
         print("\n[Step 5/14] Verifying duplicate engine calculation...")
-        rev_auth_res = httpx.post(f"{API_BASE}/auth/login", data={"username": "reviewer@civictrace.local", "password": "ReviewerPass2026!"}).json()
+        rev_auth_res = httpx.post(f"{API_BASE}/auth/login?include_token=true", data={"username": "reviewer@civictrace.local", "password": "ReviewerPass2026!"}).json()
         rev_token = rev_auth_res["access_token"]
         dup_cands_res = httpx.get(f"{API_BASE}/reports/duplicates/pending", headers={"Authorization": f"Bearer {rev_token}"}).json()
         assert isinstance(dup_cands_res, list), f"Expected list from duplicates endpoint, got: {dup_cands_res}"
@@ -127,10 +127,11 @@ def run_real_e2e_lifecycle():
         page.wait_for_url(f"{WEB_BASE}/explorer", timeout=10000)
         
         # Transition case to IN_PROGRESS then file claim
+        op_token = httpx.post(f"{API_BASE}/auth/login?include_token=true", data={"username": "lighting.operator@civictrace.local", "password": "OperatorPass2026!"}).json()["access_token"]
         claim_res = httpx.post(f"{API_BASE}/cases/{case_public_id}/claims", json={
             "work_summary": "Replaced damaged cable conduit and sealed junction box with heavy-duty weatherproofing.",
             "actions_taken": "Field crew isolated power line, replaced 14m split conduit, installed concrete protective casing, and restored supply.",
-        }, headers={"Authorization": f"Bearer {httpx.post(f'{API_BASE}/auth/login', data={'username': 'lighting.operator@civictrace.local', 'password': 'OperatorPass2026!'}).json()['access_token']}"})
+        }, headers={"Authorization": f"Bearer {op_token}"})
         assert claim_res.status_code == 200, f"Claim failed: {claim_res.text}"
         print(f"  [OK] Operator claim filed. State transitioned to AWAITING_VERIFICATION.")
 
@@ -182,7 +183,7 @@ def run_real_e2e_lifecycle():
         # Step 12: A separate case receives qualifying independent verification
         print("\n[Step 12/14] Verifying separate case resolution workflow...")
         # CAS-2026-0002 has a claim. Reviewer verifies and resolves it.
-        rev_token = httpx.post(f"{API_BASE}/auth/login", data={"username": "reviewer@civictrace.local", "password": "ReviewerPass2026!"}).json()["access_token"]
+        rev_token = httpx.post(f"{API_BASE}/auth/login?include_token=true", data={"username": "reviewer@civictrace.local", "password": "ReviewerPass2026!"}).json()["access_token"]
         verif_res = httpx.post(f"{API_BASE}/cases/CAS-2026-0002/verifications", json={
             "outcome": "CONFIRMED_FIXED",
             "notes": "Site inspection confirmed road patch is flush and drainage grates unobstructed.",
