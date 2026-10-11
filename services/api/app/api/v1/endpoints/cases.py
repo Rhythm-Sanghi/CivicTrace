@@ -268,6 +268,13 @@ def submit_verification_observation(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
+    active_claim = (
+        db.query(ResolutionClaim)
+        .filter(ResolutionClaim.case_id == case.id)
+        .order_by(ResolutionClaim.claimed_at.desc())
+        .first()
+    )
+
     try:
         target_state, event_type, actor_label = VerificationPolicyEngine.evaluate_verification_submission(
             db=db,
@@ -276,6 +283,7 @@ def submit_verification_observation(
             outcome=verif_in.outcome,
             notes=verif_in.notes,
             guest_pseudonym=verif_in.guest_pseudonym,
+            active_claim=active_claim,
         )
     except PermissionError as pe:
         raise HTTPException(status_code=403, detail=str(pe))
@@ -286,6 +294,7 @@ def submit_verification_observation(
 
     observation = VerificationObservation(
         case_id=case.id,
+        resolution_claim_id=active_claim.id if active_claim else None,
         verifier_id=current_user.id if current_user else None,
         guest_pseudonym=verif_in.guest_pseudonym or (actor_label if not current_user else None),
         outcome=verif_in.outcome,

@@ -5,8 +5,10 @@ from app.core.config import settings
 from app.db.session import engine, Base
 from app.api.v1.api import api_router
 
-# Ensure models are created on startup (or via migrations)
-Base.metadata.create_all(bind=engine)
+# Schema management: In development demo mode, tables are created automatically if AUTO_CREATE_TABLES is True.
+# In production, Alembic migrations ('alembic upgrade head') are the authoritative schema management mechanism.
+if settings.AUTO_CREATE_TABLES:
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

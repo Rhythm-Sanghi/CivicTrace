@@ -95,3 +95,92 @@ def test_rate_limiter_enforcement():
         check_rate_limit(req, max_requests=5, window_seconds=10, action_key="test_act")
     assert exc.value.status_code == 429
     assert "Rate limit exceeded" in str(exc.value.detail)
+
+
+def test_unapproved_evidence_download_protection(client, db_session):
+    import os
+    from app.models.entities import EvidenceAsset, ReportModerationStatus
+    from app.core.security import create_access_token
+    from app.core.config import settings
+
+    cat = IssueCategory(name="Evidence Test Cat", code="ETC01", default_severity_weight=1.5)
+    cit_owner = User(email="owner@civictrace.local", hashed_password="p", display_name="Owner Citizen", role=UserRole.CITIZEN)
+    cit_other = User(email="other@civictrace.local", hashed_password="p", display_name="Other Citizen", role=UserRole.CITIZEN)
+    reviewer = User(email="rev_evid@civictrace.local", hashed_password="p", display_name="Reviewer Evid", role=UserRole.REVIEWER)
+    db_session.add_all([cat, cit_owner, cit_other, reviewer])
+    db_session.commit()
+
+    # Create report with PENDING moderation status
+    report = Report(
+        public_id="RPT-TEST-EVID-001",
+        category_id=cat.id,
+        reporter_id=cit_owner.id,
+        title="Pending issue with sensitive evidence",
+        description="Private description awaiting approval",
+        latitude=22.7,
+        longitude=75.8,
+        moderation_status=ReportModerationStatus.PENDING,
+    )
+    db_session.add(report)
+    db_session.commit()
+
+    # Create test evidence file on disk
+    test_file_path = os.path.join(settings.UPLOAD_DIR, "test_pending_evidence.jpg")
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    with open(test_file_path, "wb") as f:
+        f.write(b"\xff\xd8\xff\xe0\x00\x10JFIF\x00test-evidence-payload")
+
+    asset = EvidenceAsset(
+        report_id=report.id,
+        file_name="pending_photo.jpg",
+        file_path=test_file_path,
+        file_size=32,
+        mime_type="image/jpeg",
+        sha256_hash="dummyhash123",
+        is_public=False,
+    )
+    db_session.add(asset)
+    db_session.commit()
+
+    download_url = f"/api/v1/reports/evidence/{asset.id}/download"
+
+    # 1. Anonymous public download must be rejected with 401
+    anon_resp = client.get(download_url)
+    assert anon_resp.status_code == 401
+    assert "Authentication required" in anon_resp.json()["detail"]
+
+    # 2. Unrelated citizen download must be rejected with 403
+    other_token = create_access_token(cit_other.id)
+    other_resp = client.get(download_url, headers={"Authorization": f"Bearer {other_token}"})
+    assert other_resp.status_code == 403
+    assert "Access denied" in other_resp.json()["detail"]
+
+    # 3. Owner citizen can download their own pending evidence
+    owner_token = create_access_token(cit_owner.id)
+    owner_resp = client.get(download_url, headers={"Authorization": f"Bearer {owner_token}"})
+    assert owner_resp.status_code == 200
+
+    # 4. Reviewer can download pending evidence for review
+    rev_token = create_access_token(reviewer.id)
+    rev_resp = client.get(download_url, headers={"Authorization": f"Bearer {rev_token}"})
+    assert rev_resp.status_code == 200
+
+    # 5. When reviewer approves the report, evidence becomes publicly accessible
+    mod_resp = client.post(
+        f"/api/v1/reports/{report.id}/moderate",
+        headers={"Authorization": f"Bearer {rev_token}"},
+        json={"decision": "APPROVED", "notes": "Approved for public visibility"},
+    )
+    assert mod_resp.status_code == 200
+
+    # Refresh asset state
+    db_session.refresh(asset)
+    assert asset.is_public is True
+
+    # Anonymous download now succeeds (200 OK)
+    anon_approved_resp = client.get(download_url)
+    assert anon_approved_resp.status_code == 200
+
+    # Clean up test file
+    if os.path.exists(test_file_path):
+        os.remove(test_file_path)

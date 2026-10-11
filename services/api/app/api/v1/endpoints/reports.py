@@ -189,6 +189,14 @@ def moderate_report(
     if mod_in.notes:
         report.moderation_notes = mod_in.notes
 
+    # Synchronize evidence assets visibility with moderation status
+    if mod_in.decision == ReportModerationStatus.APPROVED:
+        for asset in report.evidence_assets:
+            asset.is_public = True
+    elif mod_in.decision in [ReportModerationStatus.REJECTED, ReportModerationStatus.FLAGGED]:
+        for asset in report.evidence_assets:
+            asset.is_public = False
+
     # If approved and not yet linked to any case, check if it should create or link to case
     if mod_in.decision == ReportModerationStatus.APPROVED and not report.case_id:
         case_public_id = allocate_case_public_id(db)
@@ -413,7 +421,8 @@ async def upload_report_evidence(
     with open(saved_path, "wb") as f:
         f.write(content)
 
-    # 6. Record asset in database
+    # 6. Record asset in database - only public if parent report is already approved
+    is_public = (report.moderation_status == ReportModerationStatus.APPROVED)
     asset = EvidenceAsset(
         report_id=report.id,
         case_id=report.case_id,
@@ -423,7 +432,7 @@ async def upload_report_evidence(
         mime_type=file.content_type,
         sha256_hash=sha256_hash,
         caption=caption,
-        is_public=True,
+        is_public=is_public,
     )
     db.add(asset)
 
@@ -458,13 +467,23 @@ def download_evidence_asset(
     if not asset or not os.path.exists(asset.file_path):
         raise HTTPException(status_code=404, detail="Evidence asset not found on disk")
 
-    # Access control: If asset is not marked public, caller must be owner or reviewer/admin
-    if not asset.is_public:
+    # Access control: If asset is not marked public OR parent report is pending/unapproved,
+    # public/unauthenticated access is denied; caller must be original reporter or reviewer/admin.
+    report_approved = (asset.report is None or asset.report.moderation_status == ReportModerationStatus.APPROVED)
+    effective_public = asset.is_public and report_approved
+
+    if not effective_public:
         if not current_user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required to view non-public asset.")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required to view non-public or pending evidence."
+            )
         if current_user.role not in [UserRole.REVIEWER, UserRole.ADMINISTRATOR]:
-            if asset.report and asset.report.reporter_id != current_user.id:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+            if not (asset.report and asset.report.reporter_id == current_user.id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied. Evidence is pending moderation approval."
+                )
 
     return FileResponse(
         path=asset.file_path,

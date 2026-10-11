@@ -68,14 +68,17 @@ CivicTrace Web Interface will be live at: **`http://localhost:5173`**
 
 ---
 
-### 3. Database Migrations (Alembic)
+### 3. Database Migrations & Schema Management
 
-CivicTrace uses Alembic for declarative schema versioning and PostgreSQL / PostGIS portability:
+CivicTrace uses Alembic for declarative schema versioning and database portability:
 
 ```bash
 cd services/api
 alembic upgrade head
 ```
+
+- **Local Demo / Development Mode:** Zero-setup table bootstrapping is supported via `AUTO_CREATE_TABLES=True`.
+- **Production Mode:** Alembic migrations (`alembic upgrade head`) are the authoritative schema mechanism. The production startup gate enforces `AUTO_CREATE_TABLES=False`.
 
 ---
 
@@ -104,20 +107,23 @@ cd services/api
 python -m pytest app/tests/ -v
 ```
 
-**14/14 tests pass**, covering:
+**16/16 tests pass**, covering:
 1. Append-only SHA-256 hash chain verification and mathematical tamper detection
 2. Deterministic Haversine spatial correlation and priority calculation
 3. Conflict of interest enforcement: operators strictly blocked from self-verifying resolution claims (`403 Forbidden`)
 4. Verification quorum and anti-sybil deduplication: requires 2 independent citizen confirmations to auto-resolve uncontested cases
 5. Contradictory dispute protection: any citizen dispute (`STILL_UNRESOLVED`) immediately forces case state into `DISPUTED`
-6. Unauthorized state transition prevention via centralized `CaseStateMachine`
-7. Collision-resistant monotonic sequential public identifier allocators (`RPT-2026-XXXX`, `CAS-2026-XXXX`)
-8. In-memory sliding-window IP rate limiting on authentication and reporting endpoints
-9. Strict file magic bytes inspection (JPEG, PNG, WEBP, PDF) and 10MB streaming size validation
-10. Full lifecycle end-to-end integration flow
-11. ZIP export evidence manifest hashing and Zip-Slip traversal protection
-12. Duplicate zip entry rejection preventing archive ambiguity attacks
-13. Priority band engine mappings and critical hazard escalations
+6. Claim cycle scoping: stale verification observations on prior disputed repair claims do not leak into new claim cycles after rework; citizens can re-verify new claims
+7. Evidence authorization gating: unapproved or pending evidence cannot be downloaded publicly by anonymous callers or third-party citizens; approval required for public distribution
+8. Unauthorized state transition prevention via centralized `CaseStateMachine`
+9. Collision-resistant monotonic sequential public identifier allocators (`RPT-2026-XXXX`, `CAS-2026-XXXX`)
+10. In-memory sliding-window IP rate limiting on authentication and reporting endpoints
+11. Strict file magic bytes inspection (JPEG, PNG, WEBP, PDF) and 10MB streaming size validation
+12. Full lifecycle end-to-end integration flow
+13. ZIP export evidence manifest hashing and Zip-Slip traversal protection
+14. Duplicate zip entry rejection preventing archive ambiguity attacks
+15. Priority band engine mappings and critical hazard escalations
+16. Health check probe and service status reporting
 
 ### Frontend Component Tests (Vitest)
 ```bash
@@ -136,6 +142,32 @@ To independently verify an exported evidence package via CLI:
 ```bash
 python scripts/verify_evidence.py storage/exports/<package_name>.zip
 ```
+
+---
+
+## ⚙️ Architecture & Production Operational Notes
+
+- **Rate Limiting Scope:** The built-in rate limiter utilizes an in-memory sliding window keyed by client IP. In single-process development and standard evaluation servers, it prevents basic spam and flooding with zero external dependencies. For distributed, multi-worker (e.g. Uvicorn clusters) or multi-container horizontal deployments, replace the in-memory store with a Redis / Valkey-backed sliding-window counter.
+- **Cryptographic Ledger vs Digital Signatures:** CivicTrace provides tamper-evident append-only auditability via deterministic SHA-256 hash-chaining of canonical JSON payloads. This guarantees mathematical tamper detection and timeline ordering, but is distinct from PKI digital signatures.
+- **Geographic Model:** CivicTrace uses an offline schematic map model with synthetic municipal defect data situated in Indore Ward 34. It does not connect to commercial mapping APIs or transmit user location externally.
+
+---
+
+## 🔀 Repository Default Branch Configuration
+
+The remote repository default branch is currently set to `master`. To align with standard modern conventions and make `main` the authoritative default branch on GitHub:
+
+1. **Via GitHub Web UI:**
+   - Navigate to the repository on GitHub: `https://github.com/Rhythm-Sanghi/CivicTrace`
+   - Go to **Settings** > **General** > **Default branch**
+   - Click the switch icon (⇄) next to `master`
+   - Select `main` from the dropdown list and click **Update**
+   - Confirm the prompt to switch the default branch to `main`.
+2. **Via GitHub CLI (`gh`):**
+   ```bash
+   gh repo edit Rhythm-Sanghi/CivicTrace --default-branch main
+   ```
+*(Do not delete the `master` branch until confirmed and approved).*
 
 ---
 

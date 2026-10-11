@@ -303,6 +303,7 @@ class ResolutionClaim(Base):
     case = relationship("Case", back_populates="resolution_claims")
     operator = relationship("User")
     evidence_assets = relationship("EvidenceAsset", back_populates="resolution_claim")
+    verifications = relationship("VerificationObservation", back_populates="resolution_claim")
 
 
 class VerificationObservation(Base):
@@ -310,6 +311,7 @@ class VerificationObservation(Base):
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     case_id = Column(String(36), ForeignKey("cases.id"), nullable=False)
+    resolution_claim_id = Column(String(36), ForeignKey("resolution_claims.id"), nullable=True)
     verifier_id = Column(String(36), ForeignKey("users.id"), nullable=True) # Citizen verifier or guest
     guest_pseudonym = Column(String(100), nullable=True)
 
@@ -319,6 +321,7 @@ class VerificationObservation(Base):
     submitted_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     case = relationship("Case", back_populates="verifications")
+    resolution_claim = relationship("ResolutionClaim", back_populates="verifications")
     verifier = relationship("User")
     evidence_assets = relationship("EvidenceAsset", back_populates="verification")
 

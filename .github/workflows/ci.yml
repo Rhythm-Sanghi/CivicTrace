@@ -23,6 +23,10 @@ jobs:
         run: |
           cd services/api
           ruff check .
+      - name: Verify Migrations Apply Cleanly
+        run: |
+          cd services/api
+          alembic upgrade head
       - name: Run Backend Tests
         run: |
           cd services/api
@@ -35,7 +39,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Clean install dependencies
         run: |
           cd apps/web

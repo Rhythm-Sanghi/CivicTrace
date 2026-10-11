@@ -102,3 +102,82 @@ def test_unauthorized_state_transition_blocked():
     )
     assert can_trans_op is False
     assert "not authorized" in err_op
+
+
+def test_stale_observations_scoped_to_claim_cycle(db_session):
+    from app.models.entities import ResolutionClaim, VerificationObservation
+
+    cat = IssueCategory(name="Test Sanitation", code="TS01", default_severity_weight=2.0)
+    op = User(email="op1@civictrace.local", hashed_password="p", display_name="Op 1", role=UserRole.OPERATOR)
+    cit1 = User(email="cit1_cycle@civictrace.local", hashed_password="p", display_name="Cit 1", role=UserRole.CITIZEN)
+    cit2 = User(email="cit2_cycle@civictrace.local", hashed_password="p", display_name="Cit 2", role=UserRole.CITIZEN)
+    case = Case(public_id="TEST-V-CYCLE", category=cat, title="Garbage Overflow", description="Waste pile", latitude=22.7, longitude=75.8, state=CaseState.AWAITING_VERIFICATION)
+    db_session.add_all([cat, op, cit1, cit2, case])
+    db_session.commit()
+
+    # Operator claims resolution (Claim 1)
+    claim1 = ResolutionClaim(
+        case_id=case.id,
+        operator_id=op.id,
+        work_summary="Cleared garbage initial attempt",
+        actions_taken="Collected trash",
+        status="AWAITING_VERIFICATION",
+    )
+    db_session.add(claim1)
+    db_session.commit()
+
+    # Citizen 1 confirms fixed on Claim 1 (Quorum not reached yet, need 2)
+    st1, _, _ = VerificationPolicyEngine.evaluate_verification_submission(
+        db=db_session, case=case, user=cit1, outcome=VerificationOutcome.CONFIRMED_FIXED, notes="First check", active_claim=claim1
+    )
+    assert st1 == CaseState.AWAITING_VERIFICATION
+    obs1 = VerificationObservation(
+        case_id=case.id, resolution_claim_id=claim1.id, verifier_id=cit1.id, outcome=VerificationOutcome.CONFIRMED_FIXED, notes="First check"
+    )
+    db_session.add(obs1)
+    db_session.commit()
+
+    # Citizen 2 discovers trash is still there and disputes it -> Claim 1 is disputed, case is DISPUTED
+    st_disp, _, _ = VerificationPolicyEngine.evaluate_verification_submission(
+        db=db_session, case=case, user=cit2, outcome=VerificationOutcome.STILL_UNRESOLVED, notes="Still full of trash", active_claim=claim1
+    )
+    assert st_disp == CaseState.DISPUTED
+    assert claim1.status == "DISPUTED"
+    obs_disp = VerificationObservation(
+        case_id=case.id, resolution_claim_id=claim1.id, verifier_id=cit2.id, outcome=VerificationOutcome.STILL_UNRESOLVED, notes="Still full", is_dispute=True
+    )
+    case.state = CaseState.DISPUTED
+    db_session.add(obs_disp)
+    db_session.commit()
+
+    # Operator performs actual rework and submits a NEW repair claim (Claim 2)
+    claim2 = ResolutionClaim(
+        case_id=case.id,
+        operator_id=op.id,
+        work_summary="Cleaned completely second attempt with truck",
+        actions_taken="Deep cleaning",
+        status="AWAITING_VERIFICATION",
+    )
+    case.state = CaseState.AWAITING_VERIFICATION
+    db_session.add(claim2)
+    db_session.commit()
+
+    # CRITICAL CHECK: Citizen 1 (who previously confirmed Claim 1) must NOT be blocked from confirming the NEW Claim 2
+    # And their new confirmation on Claim 2 must NOT combine with the stale confirmation on Claim 1 to prematurely resolve!
+    st_new_1, _, _ = VerificationPolicyEngine.evaluate_verification_submission(
+        db=db_session, case=case, user=cit1, outcome=VerificationOutcome.CONFIRMED_FIXED, notes="Re-checked after new rework", active_claim=claim2
+    )
+    # Total on Claim 2 is only 1 (stale Claim 1 confirmation is excluded). Case must remain AWAITING_VERIFICATION!
+    assert st_new_1 == CaseState.AWAITING_VERIFICATION
+    obs_new_1 = VerificationObservation(
+        case_id=case.id, resolution_claim_id=claim2.id, verifier_id=cit1.id, outcome=VerificationOutcome.CONFIRMED_FIXED, notes="Re-checked"
+    )
+    db_session.add(obs_new_1)
+    db_session.commit()
+
+    # Citizen 2 now also checks and confirms fixed on Claim 2 -> Now quorum of 2 is reached on Claim 2!
+    st_new_2, _, _ = VerificationPolicyEngine.evaluate_verification_submission(
+        db=db_session, case=case, user=cit2, outcome=VerificationOutcome.CONFIRMED_FIXED, notes="Checked second time, now clean", active_claim=claim2
+    )
+    assert st_new_2 == CaseState.RESOLVED
+    assert claim2.status == "VERIFIED"

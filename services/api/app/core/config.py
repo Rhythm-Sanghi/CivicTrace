@@ -24,6 +24,9 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: Union[List[str], str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+    # Schema management: Set to True for zero-dependency local demo/development; in production, use Alembic migrations
+    AUTO_CREATE_TABLES: bool = True
+
     # Resolution Verification Policy Constants
     # Minimum required confirmations from distinct identities to automatically resolve an uncontested claim
     CONFIRMATIONS_REQUIRED_FOR_AUTO_RESOLVE: int = 2
@@ -50,6 +53,8 @@ settings = Settings()
 if settings.ENVIRONMENT.lower() == "production":
     if settings.SECRET_KEY == "civictrace-insecure-development-secret-change-in-production-2026":
         raise RuntimeError("FATAL: Cannot start CivicTrace in production with default insecure SECRET_KEY.")
+    if settings.AUTO_CREATE_TABLES:
+        raise RuntimeError("FATAL: AUTO_CREATE_TABLES must be False in production. Use Alembic migrations instead.")
 
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 os.makedirs(settings.EXPORT_DIR, exist_ok=True)

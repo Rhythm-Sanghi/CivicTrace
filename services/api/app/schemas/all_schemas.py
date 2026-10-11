@@ -185,6 +185,7 @@ class VerificationCreate(BaseModel):
 class VerificationPublic(BaseModel):
     id: str
     case_id: str
+    resolution_claim_id: Optional[str] = None
     outcome: VerificationOutcome
     notes: str
     is_dispute: bool

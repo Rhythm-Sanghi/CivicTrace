@@ -4,6 +4,13 @@ from fastapi import Request, HTTPException, status
 
 # In-memory sliding window rate limiter
 # Key: client_ip (or identifier) -> list of timestamp floats
+# NOTE: Process-local in-memory state. In single-process development / demo deployments,
+# this provides lightweight zero-dependency protection against basic flooding and brute-force attempts.
+# PRODUCTION DEPLOYMENT LIMITATION:
+# In multi-worker (e.g. Uvicorn with multiple workers) or horizontally autoscaled multi-container
+# deployments, each process maintains an independent window memory. For distributed production clusters,
+# this mechanism should be backed by a centralized key-value store (e.g., Redis or Valkey) using
+# an atomic sliding-window script or token-bucket algorithm.
 _request_records: Dict[str, list[float]] = {}
 
 def check_rate_limit(
@@ -15,6 +22,8 @@ def check_rate_limit(
     """
     Enforces in-memory sliding window rate limits based on client IP.
     Raises HTTPException(429) if exceeded.
+
+    Single-process scope: Tracks request timestamps within local process memory.
     """
     client_ip = request.client.host if request.client else "unknown"
     key = f"{action_key}:{client_ip}"
