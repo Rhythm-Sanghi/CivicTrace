@@ -186,7 +186,7 @@ CivicTrace follows the **Benchlight Design System** (Workshop + Gridline + Studi
 
 ---
 
-## 📜 License & Compliance
+## License & Compliance
 
 Licensed under the **Apache License, Version 2.0**. See [`LICENSE`](LICENSE) for details.
 CivicTrace does not require or bundle proprietary Google Maps or Mapbox API keys. Demonstrations use an offline schematic map model of Indore Ward 34 with illustrative municipal records.
