@@ -23,23 +23,28 @@ export const CaseDetailsView: React.FC = () => {
   const [verificationSubmitting, setVerificationSubmitting] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string>("");
 
-  const loadData = () => {
+  const loadData = async () => {
     if (!id) return;
-    Promise.all([
-      api.getCase(id),
-      api.getCaseEvents(id),
-      api.verifyLedger(id),
-    ])
-      .then(([c, evts, val]) => {
-        setCaseItem(c);
+    try {
+      const c = await api.getCase(id);
+      setCaseItem(c);
+      try {
+        const evts = await api.getCaseEvents(id);
         setEvents(evts);
+      } catch (e) {
+        console.error("Events error", e);
+      }
+      try {
+        const val = await api.verifyLedger(id);
         setLedgerValidation(val);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+      } catch (e) {
+        console.error("Ledger validation error", e);
+      }
+    } catch (err: any) {
+      console.error("Failed to load case", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -93,7 +98,7 @@ export const CaseDetailsView: React.FC = () => {
         description={`${caseItem.title} · ${caseItem.address_reference}`}
       >
         <a
-          href={`http://localhost:8000/api/v1/cases/${caseItem.public_id}/export`}
+          href={`/api/v1/cases/${caseItem.public_id}/export`}
           className="button-primary"
           download
         >
@@ -153,6 +158,18 @@ export const CaseDetailsView: React.FC = () => {
                   className="button-primary btn-sm"
                 >
                   Verify Case
+                </button>
+              )}
+
+              {(user.role === "REVIEWER" || user.role === "ADMINISTRATOR") && (caseItem.state === "VERIFIED" || caseItem.state === "SUBMITTED") && (
+                <button
+                  onClick={async () => {
+                    await api.transitionCase(caseItem.id, "ASSIGNED", "Dispatched to Line Crew");
+                    loadData();
+                  }}
+                  className="button-primary btn-sm"
+                >
+                  Dispatch to Department
                 </button>
               )}
 
@@ -290,7 +307,12 @@ export const CaseDetailsView: React.FC = () => {
 
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
               {events.map((evt) => {
-                const payload = JSON.parse(evt.payload_json || "{}");
+                let payload: Record<string, any> = {};
+                try {
+                  payload = typeof evt.payload_json === "string" ? JSON.parse(evt.payload_json || "{}") : (evt.payload_json || {});
+                } catch {
+                  payload = { raw: String(evt.payload_json) };
+                }
                 let borderAccent = "var(--border)";
                 if (evt.event_type.includes("DISPUTE")) borderAccent = "var(--danger)";
                 else if (evt.event_type.includes("VERIFIED") || evt.event_type.includes("RESOLVED")) borderAccent = "var(--success)";

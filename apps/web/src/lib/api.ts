@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000/api/v1";
+const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api/v1";
 
 export interface User {
   id: string;
@@ -63,6 +63,7 @@ export interface Report {
   moderation_status: string;
   case_id?: string;
   guest_pseudonym?: string;
+  upload_token?: string;
   created_at: string;
 }
 
@@ -111,7 +112,7 @@ export function getCsrfToken(): string | null {
   return match ? decodeURIComponent(match[2]) : null;
 }
 
-export function clearAuthToken() {
+export async function clearAuthToken(): Promise<void> {
   try {
     localStorage.removeItem("civictrace_token");
     sessionStorage.removeItem("civictrace_token");
@@ -125,11 +126,13 @@ export function clearAuthToken() {
     headers["X-CSRF-Token"] = csrfToken;
   }
   
-  fetch(`${API_BASE}/auth/logout`, {
-    method: "POST",
-    credentials: "include",
-    headers,
-  }).catch(() => {});
+  try {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      headers,
+    });
+  } catch {}
 }
 
 export function getCurrentUser(): User | null {
@@ -195,6 +198,7 @@ export const api = {
   }) => request<Report>("/reports", { method: "POST", body: JSON.stringify(data) }),
 
   getReports: () => request<Report[]>("/reports"),
+  getPendingReports: () => request<Report[]>("/reports/pending"),
   getMyReports: () => request<Report[]>("/reports/my"),
   moderateReport: (reportId: string, decision: "APPROVED" | "FLAGGED" | "REJECTED", notes?: string) =>
     request<Report>(`/reports/${reportId}/moderate`, {
@@ -202,7 +206,7 @@ export const api = {
       body: JSON.stringify({ decision, notes }),
     }),
 
-  uploadEvidence: async (reportId: string, file: File, caption?: string) => {
+  uploadEvidence: async (reportId: string, file: File, caption?: string, uploadToken?: string) => {
     const formData = new FormData();
     formData.append("file", file);
     if (caption) formData.append("caption", caption);
@@ -211,6 +215,9 @@ export const api = {
     const csrf = getCsrfToken();
     if (csrf) {
       headers["X-CSRF-Token"] = csrf;
+    }
+    if (uploadToken) {
+      headers["X-Upload-Token"] = uploadToken;
     }
 
     const res = await fetch(`${API_BASE}/reports/${reportId}/evidence`, {
@@ -258,6 +265,11 @@ export const api = {
 
   transitionCase: (caseId: string, target_state: string, notes?: string) =>
     request<Case>(`/cases/${caseId}/transition?target_state=${target_state}&notes=${encodeURIComponent(notes || "")}`, {
+      method: "POST",
+    }),
+
+  assignCase: (caseId: string, departmentId: string, notes?: string) =>
+    request<Case>(`/cases/${caseId}/assign?department_id=${encodeURIComponent(departmentId)}&notes=${encodeURIComponent(notes || "")}`, {
       method: "POST",
     }),
 

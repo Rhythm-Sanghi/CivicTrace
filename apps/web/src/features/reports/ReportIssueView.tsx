@@ -150,16 +150,24 @@ export const ReportIssueView: React.FC = () => {
         guest_pseudonym: pseudonym.trim() || undefined,
       });
 
+      let evidenceUploadFailed = false;
+      let evidenceErrorMsg = "";
       if (evidenceFile) {
         try {
-          await api.uploadEvidence(res.id, evidenceFile, "Initial observation photo evidence");
+          await api.uploadEvidence(res.id, evidenceFile, "Initial observation photo evidence", res.upload_token);
         } catch (uploadErr: any) {
+          evidenceUploadFailed = true;
+          evidenceErrorMsg = uploadErr.message || "Failed to attach evidence file.";
           console.warn("Evidence attachment error:", uploadErr.message);
         }
       }
 
       clearDraft();
-      setSuccessResult(res);
+      setSuccessResult({
+        ...res,
+        evidenceFailed: evidenceUploadFailed,
+        evidenceError: evidenceErrorMsg,
+      });
       setLoading(false);
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to submit report");
@@ -210,6 +218,25 @@ export const ReportIssueView: React.FC = () => {
               <div><strong>Location:</strong> {successResult.address_reference}</div>
               <div><strong>Coordinates:</strong> <code className="numeric">{successResult.latitude.toFixed(5)}, {successResult.longitude.toFixed(5)}</code></div>
             </div>
+
+            {successResult.evidenceFailed && (
+              <div
+                role="alert"
+                style={{
+                  background: "var(--surface)",
+                  border: "1px solid var(--warning)",
+                  borderLeft: "3px solid var(--warning)",
+                  padding: "var(--space-3) var(--space-4)",
+                  marginBottom: "var(--space-4)",
+                  fontSize: "12px",
+                }}
+              >
+                <strong style={{ color: "var(--warning)" }}>Notice on Attached Media:</strong>
+                <p style={{ margin: "4px 0 0", color: "var(--text-secondary)" }}>
+                  Your report was safely created as <code>{successResult.public_id}</code>, but the evidence attachment encountered an issue ({successResult.evidenceError}). You can add or re-upload evidence from the case detail view.
+                </p>
+              </div>
+            )}
 
             <div className="action-group">
               <button

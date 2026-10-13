@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { api, type Case } from "../../lib/api";
+import { api, getCurrentUser, type Case } from "../../lib/api";
 import { PageHeading, SectionHeader, StatusStamp } from "../../components/FieldPrimitives";
 
 export const OperatorWorkspaceView: React.FC = () => {
+  const currentUser = getCurrentUser();
   const [assignedCases, setAssignedCases] = useState<Case[]>([]);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [workSummary, setWorkSummary] = useState<string>("");
@@ -14,10 +15,13 @@ export const OperatorWorkspaceView: React.FC = () => {
     api.getCases()
       .then((cases) => {
         const pending = cases.filter((c) =>
-          ["ASSIGNED", "IN_PROGRESS", "AWAITING_VERIFICATION"].includes(c.state)
+          ["ASSIGNED", "IN_PROGRESS", "DISPUTED", "AWAITING_VERIFICATION"].includes(c.state)
         );
         setAssignedCases(pending);
-        if (pending.length > 0 && !selectedCase) setSelectedCase(pending[0]);
+        setSelectedCase((prev) => {
+          if (!prev) return pending[0] || null;
+          return pending.find((c) => c.id === prev.id) || pending[0] || null;
+        });
       })
       .catch((err) => setStatusMsg(`Error: ${err.message}`));
   };
@@ -25,6 +29,20 @@ export const OperatorWorkspaceView: React.FC = () => {
   useEffect(() => {
     loadCases();
   }, []);
+
+  const handleStartWork = async () => {
+    if (!selectedCase) return;
+    setSubmitting(true);
+    try {
+      await api.transitionCase(selectedCase.id, "IN_PROGRESS", "Operator crew dispatched to location.");
+      setStatusMsg("Case status updated to In Progress.");
+      loadCases();
+    } catch (err: any) {
+      setStatusMsg(`Error: ${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleClaimSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +71,7 @@ export const OperatorWorkspaceView: React.FC = () => {
       <PageHeading
         index="06"
         title="Operator terminal"
-        description="Active Work Orders & Resolution Claims · Log repair operations and file completion evidence. Claims remain in Awaiting Community Verification until verified by the public."
+        description={`Active Work Orders & Resolution Claims · Terminal Operator: ${currentUser?.display_name || "Field Unit"} · Log repair operations and file completion evidence. Claims remain in Awaiting Community Verification until verified by the public.`}
       />
 
       <div className="workspace">
@@ -86,6 +104,7 @@ export const OperatorWorkspaceView: React.FC = () => {
                   return (
                     <div
                       key={c.id}
+                      data-testid={`case-row-${c.public_id}`}
                       onClick={() => setSelectedCase(c)}
                       style={{
                         padding: "var(--space-3)",
@@ -151,14 +170,27 @@ export const OperatorWorkspaceView: React.FC = () => {
                     />
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="button-primary"
-                    style={{ width: "100%" }}
-                  >
-                    {submitting ? "Submitting claim..." : "File Resolution Claim"}
-                  </button>
+                  <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                    {selectedCase.state === "ASSIGNED" && (
+                      <button
+                        type="button"
+                        onClick={handleStartWork}
+                        disabled={submitting}
+                        className="btn-outline"
+                        style={{ flex: 1, justifyContent: "center" }}
+                      >
+                        Start Repair (In Progress)
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="button-primary"
+                      style={{ flex: 1, justifyContent: "center" }}
+                    >
+                      {submitting ? "Submitting claim..." : "File Resolution Claim"}
+                    </button>
+                  </div>
                 </form>
               ) : (
                 <p className="empty">Select a work order from the queue to file resolution evidence.</p>

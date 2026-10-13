@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { getCurrentUser, clearAuthToken, type User } from "../lib/api";
+import { api, getCurrentUser, clearAuthToken, type User } from "../lib/api";
 
 function CivicBeacon() {
   return (
@@ -24,8 +24,20 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(getCurrentUser());
 
-  const handleLogout = () => {
-    clearAuthToken();
+  React.useEffect(() => {
+    // Validate session against backend /auth/me to maintain reactive synchronization
+    api.getMe()
+      .then((serverUser) => {
+        setUser(serverUser);
+      })
+      .catch(() => {
+        // If cookie is expired or unauthorized, reset state
+        setUser(null);
+      });
+  }, []);
+
+  const handleLogout = async () => {
+    await clearAuthToken();
     setUser(null);
     navigate("/");
   };

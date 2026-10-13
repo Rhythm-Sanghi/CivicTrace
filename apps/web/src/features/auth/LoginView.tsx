@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 import { PageHeading, SectionHeader } from "../../components/FieldPrimitives";
 
@@ -117,6 +117,15 @@ export const LoginView: React.FC = () => {
                   Administrator
                 </button>
               </div>
+            </div>
+
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)", textAlign: "center" }}>
+              <span className="muted" style={{ fontSize: "12px" }}>
+                New citizen?{" "}
+                <Link to="/register" style={{ color: "var(--accent)", fontWeight: 600 }}>
+                  Create an account
+                </Link>
+              </span>
             </div>
           </div>
         </div>

@@ -17,6 +17,8 @@ export const CasesExplorerView: React.FC = () => {
   const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(true);
   const [sortField, setSortField] = useState<SortField>("priority_score");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 15;
 
   useEffect(() => {
     Promise.all([
@@ -70,6 +72,12 @@ export const CasesExplorerView: React.FC = () => {
       return sortDirection === "asc" ? comparison : -comparison;
     });
   }, [cases, selectedCategory, selectedBand, selectedState, searchQuery, sortField, sortDirection]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedCases.length / pageSize));
+  const paginatedCases = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredAndSortedCases.slice(startIndex, startIndex + pageSize);
+  }, [filteredAndSortedCases, currentPage, pageSize]);
 
   // Keyboard navigation support
   const handleKeyDown = (e: React.KeyboardEvent, c: Case) => {
@@ -214,7 +222,7 @@ export const CasesExplorerView: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredAndSortedCases.map((c) => {
+                  paginatedCases.map((c) => {
                     const isSelected = activeCase?.id === c.id;
                     return (
                       <tr
@@ -268,6 +276,49 @@ export const CasesExplorerView: React.FC = () => {
                 )}
               </tbody>
             </table>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "var(--space-3) var(--space-4)",
+                  borderTop: "1px solid var(--border)",
+                  fontSize: "12px",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <div>
+                  Showing {Math.min((currentPage - 1) * pageSize + 1, filteredAndSortedCases.length)}–
+                  {Math.min(currentPage * pageSize, filteredAndSortedCases.length)} of {filteredAndSortedCases.length} cases
+                </div>
+                <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                  <button
+                    type="button"
+                    className="button-subtle"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    style={{ padding: "4px 10px", fontSize: "12px" }}
+                  >
+                    Previous
+                  </button>
+                  <span style={{ display: "flex", alignItems: "center", padding: "0 4px" }}>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="button-subtle"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    style={{ padding: "4px 10px", fontSize: "12px" }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Inspector Pane */}

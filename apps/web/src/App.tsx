@@ -9,6 +9,7 @@ import { ReviewerWorkspaceView } from "./features/reviewer/ReviewerWorkspaceView
 import { OperatorWorkspaceView } from "./features/operator/OperatorWorkspaceView";
 import { NeighborhoodIntelligenceView } from "./features/neighborhood/NeighborhoodIntelligenceView";
 import { LoginView } from "./features/auth/LoginView";
+import { RegisterView } from "./features/auth/RegisterView";
 import "./styles/tokens.css";
 
 export const App: React.FC = () => {
@@ -24,6 +25,7 @@ export const App: React.FC = () => {
           <Route path="/operator" element={<OperatorWorkspaceView />} />
           <Route path="/neighborhood" element={<NeighborhoodIntelligenceView />} />
           <Route path="/login" element={<LoginView />} />
+          <Route path="/register" element={<RegisterView />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppShell>
