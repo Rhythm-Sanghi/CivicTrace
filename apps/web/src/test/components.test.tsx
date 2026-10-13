@@ -28,7 +28,7 @@ describe("Frontend Core Components & Benchlight Design System", () => {
     expect(screen.getByText("Child workspace")).toBeInTheDocument();
   });
 
-  it("renders Login view with demo role credentials", () => {
+  it("renders Login view with demo role credentials in development mode", () => {
     render(
       <MemoryRouter>
         <LoginView />
@@ -41,6 +41,34 @@ describe("Frontend Core Components & Benchlight Design System", () => {
     expect(screen.getByText("Operator (Kavita)")).toBeInTheDocument();
     expect(screen.getByText("Administrator")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Sign In to Portal/i })).toBeInTheDocument();
+  });
+
+  it("suppresses demo seed credentials and one-click controls in production mode", () => {
+    const originalProd = import.meta.env.PROD;
+    const originalMode = import.meta.env.MODE;
+    const originalDev = import.meta.env.DEV;
+
+    try {
+      (import.meta.env as any).PROD = true;
+      (import.meta.env as any).MODE = "production";
+      (import.meta.env as any).DEV = false;
+
+      const { unmount } = render(
+        <MemoryRouter>
+          <LoginView />
+        </MemoryRouter>
+      );
+
+      expect(screen.getByText("CivicTrace Portal Sign-In")).toBeInTheDocument();
+      expect(screen.queryByText(/One-Click Seed Accounts/i)).not.toBeInTheDocument();
+      expect(screen.queryByText("Citizen (Aarav)")).not.toBeInTheDocument();
+      expect(screen.queryByText("Administrator")).not.toBeInTheDocument();
+      unmount();
+    } finally {
+      (import.meta.env as any).PROD = originalProd;
+      (import.meta.env as any).MODE = originalMode;
+      (import.meta.env as any).DEV = originalDev;
+    }
   });
 
   it("ensures no JWT or authentication token is stored in localStorage or sessionStorage", async () => {

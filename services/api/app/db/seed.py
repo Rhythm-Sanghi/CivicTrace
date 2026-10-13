@@ -22,9 +22,18 @@ from app.core.config import settings
 
 
 def seed_database(reset: bool = False, allow_destructive_reset: bool = False):
+    # Non-negotiable security guard: Demo database seeding is strictly prohibited in production environments.
+    # Refuses to seed known demonstration credentials or accounts without altering any existing user accounts.
+    env = settings.ENVIRONMENT.lower()
+    if env in ("production", "prod") or "prod" in settings.DATABASE_URL.lower():
+        raise RuntimeError(
+            "SECURITY ABORT: Demo database seeding is strictly prohibited in production environments. "
+            "Refusing to seed known demonstration accounts or passwords into production."
+        )
+
     if reset:
         # Non-negotiable rule: Never drop tables on a production or non-test database
-        if settings.ENVIRONMENT.lower() == "production" or not allow_destructive_reset:
+        if not allow_destructive_reset:
             print(
                 "Notice: Destructive reset requested but prevented by safety guard. Using non-destructive schema initialization."
             )

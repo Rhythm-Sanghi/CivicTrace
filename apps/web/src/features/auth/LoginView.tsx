@@ -29,6 +29,16 @@ export const LoginView: React.FC = () => {
     setPassword(rolePass);
   };
 
+  // One-click demo credentials are strictly confined to local development mode.
+  // In production builds (import.meta.env.DEV === false, import.meta.env.PROD === true),
+  // bundler dead-code elimination completely eliminates this branch, stripping all demo credentials.
+  // Demo switches cannot be accidentally enabled in production because PROD / MODE check fails closed.
+  const isDemoLoginAllowed =
+    Boolean(import.meta.env.DEV) &&
+    !import.meta.env.PROD &&
+    import.meta.env.MODE !== "production" &&
+    import.meta.env.VITE_ENABLE_DEMO_LOGIN !== "false";
+
   return (
     <>
       <PageHeading
@@ -83,41 +93,43 @@ export const LoginView: React.FC = () => {
               </button>
             </form>
 
-            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-4)" }}>
-              <span className="muted" style={{ fontSize: "11px", display: "block", marginBottom: "var(--space-2)" }}>
-                One-Click Seed Accounts:
-              </span>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoFill("citizen.aarav@civictrace.local", "CitizenPass2026!")}
-                  className="btn-outline btn-sm"
-                >
-                  Citizen (Aarav)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoFill("reviewer@civictrace.local", "ReviewerPass2026!")}
-                  className="btn-outline btn-sm"
-                >
-                  Reviewer (Rajesh)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoFill("lighting.operator@civictrace.local", "OperatorPass2026!")}
-                  className="btn-outline btn-sm"
-                >
-                  Operator (Kavita)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoFill("admin@civictrace.local", "AdminPass2026!")}
-                  className="btn-outline btn-sm"
-                >
-                  Administrator
-                </button>
+            {isDemoLoginAllowed && (
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-4)" }}>
+                <span className="muted" style={{ fontSize: "11px", display: "block", marginBottom: "var(--space-2)" }}>
+                  One-Click Seed Accounts (Development Demo Only):
+                </span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemoFill("citizen.aarav@civictrace.local", "CitizenPass2026!")}
+                    className="btn-outline btn-sm"
+                  >
+                    Citizen (Aarav)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemoFill("reviewer@civictrace.local", "ReviewerPass2026!")}
+                    className="btn-outline btn-sm"
+                  >
+                    Reviewer (Rajesh)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemoFill("lighting.operator@civictrace.local", "OperatorPass2026!")}
+                    className="btn-outline btn-sm"
+                  >
+                    Operator (Kavita)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemoFill("admin@civictrace.local", "AdminPass2026!")}
+                    className="btn-outline btn-sm"
+                  >
+                    Administrator
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)", textAlign: "center" }}>
               <span className="muted" style={{ fontSize: "12px" }}>

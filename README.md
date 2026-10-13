@@ -1,28 +1,70 @@
-# CIVICTRACE
+# CivicTrace
 
-> **"A public record of problems worth fixing."**
+> A public record of problems worth fixing.
 
-CivicTrace is an open-source, evidence-oriented civic infrastructure investigation system. Unlike traditional complaint ticketing software where tickets disappear into an unverifiable "Resolved" status, CivicTrace provides an **append-only cryptographic event ledger**, **deterministic CPU-based duplicate correlation**, and **independent citizen verification**.
+CivicTrace is an open-source, evidence-oriented civic infrastructure investigation system. Traditional municipal ticketing tools allow issues to disappear into an unverifiable "Closed" status. CivicTrace replaces opaque ticket updates with an **append-only cryptographic event ledger**, **deterministic spatial-textual duplicate correlation**, and **independent citizen verification gates**.
 
-Built with a modular monolith architecture for **WarriorHacks 2.0** (Theme: Civic infrastructure accountability).
+Built for WarriorHacks 2.0 under the theme of civic infrastructure accountability.
 
 ---
 
-## The Core Difference
+## System Overview
 
-| Generic Complaint Portals | CivicTrace Evidence Ledger |
+```
+                      +---------------------------------------+
+                      |       Citizen & Official Portal       |
+                      |   (React 18 + TypeScript + Vite)      |
+                      +-------------------+-------------------+
+                                          |
+                                HTTP / REST API (FastAPI)
+                                          |
+                      +-------------------v-------------------+
+                      |          CivicTrace API Core          |
+                      |  - State Machine Governance           |
+                      |  - Deterministic Duplicate Engine     |
+                      |  - Priority Band Calculator           |
+                      |  - Cryptographic Signer & Ledger      |
+                      +---------+-------------------+---------+
+                                |                   |
+                 +--------------+                   +-------------+
+                 |                                                |
+    +------------v-------------+                    +-------------v-------------+
+    |   Database Persistence   |                    |   Evidence Storage        |
+    | - SQLite (Local / Demo)  |                    | - Local Storage / Uploads |
+    | - PostgreSQL + PostGIS   |                    | - SHA-256 Verified Assets |
+    |   (Production / Cluster) |                    | - Tamper-Evident Packages |
+    +--------------------------+                    +---------------------------+
+```
+
+### Visual Interface & Screenshots
+
+CivicTrace follows the **Workshop + Gridline + Studio Utility** visual identity: dense, functional layouts, baseline grids, subtle borders, and monospace data labels.
+
+| Case Explorer | Cryptographic Case Ledger |
+| :---: | :---: |
+| ![Case Explorer](docs/screenshots/02_cases_explorer.png) | ![Case Ledger](docs/screenshots/03_case_details_ledger.png) |
+
+| Neighborhood Intelligence | Resolution Dispute Workflow |
+| :---: | :---: |
+| ![Neighborhood Intelligence](docs/screenshots/04_neighborhood_intelligence.png) | ![Resolution Dispute](docs/screenshots/07_resolution_dispute.png) |
+
+---
+
+## Core Differentiators
+
+| Standard Complaint Ticketing | CivicTrace Evidence Platform |
 | :--- | :--- |
-| **Disappearing Tickets:** Department marks "Closed" and ticket vanishes. | **Citizen Verification Gate:** Operator-claimed repairs remain in `Awaiting Verification` pending citizen observation. Under conservative verification policy, auto-closure requires trusted identity credentials; otherwise authorized reviewer sign-off is required. |
-| **Scattered Duplicates:** Multiple neighbors submit reports for the same pothole; each treated as isolated incidents. | **Deterministic Duplicate Engine:** Automatically correlates observations via Haversine proximity, vocabulary Jaccard similarity, and category weights into consolidated cases with preserved provenance. |
-| **Opaque Status Changes:** Timestamps and notes can be edited or deleted by database administrators. | **Tamper-Evident Cryptographic Ledger:** Every status change, assignment, work claim, and inspection is linked via SHA-256 hash chaining. Event modifications are mathematically detectable, and external Ed25519 checkpoints protect against full database rewrites. |
-| **Memoryless Systems:** Repaired roads break down again 2 weeks later; previous history is erased. | **Chronic Recurrence Intelligence:** Tracks road and pipe failures re-emerging at the same coordinates (50-meter radius) within 60 days. |
-| **Locked Data:** Data trapped inside proprietary municipal silos. | **Portable Evidence Package:** Exports ZIP evidence packages containing JSON timelines and SHA-256 integrity manifests. |
+| **Disappearing Tickets:** Departments mark issues "Closed" with no verification. | **Citizen Verification Gate:** Operator-claimed repairs enter `Awaiting Verification`. Under conservative policy, auto-closure requires trusted identity credentials; otherwise, authorized reviewer sign-off is required. |
+| **Scattered Duplicate Reports:** Multiple citizens report the same defect; each creates a separate ticket. | **Deterministic Duplicate Engine:** Automatically correlates reports via Haversine distance, token similarity, and category weights into consolidated cases with preserved provenance. |
+| **Opaque Status Changes:** Timestamps and status history can be silently edited in the database. | **Tamper-Evident Cryptographic Ledger:** Every status change, assignment, work claim, and inspection is chained via SHA-256 hashes (Schema v2 canonicalization). Modifying historical rows breaks cryptographic verification. |
+| **Memoryless History:** Potholes repaired poorly break open again in weeks; previous tickets are gone. | **Chronic Recurrence Intelligence:** Automatically identifies and links recurring defects re-emerging at the same coordinates within 60 days. |
+| **Proprietary Data Silos:** Data trapped inside vendor systems. | **Portable Evidence Packages:** Exports self-contained ZIP evidence bundles containing JSON audit logs, evidence files, and SHA-256 integrity manifests with optional Ed25519 digital signatures. |
 
 ---
 
 ## Quick Start (Local Development)
 
-CivicTrace requires zero paid APIs, zero cloud AI subscriptions, and no mandatory Docker. It runs smoothly on any modern laptop (e.g. Windows 11 / WSL2 / macOS / Linux).
+CivicTrace requires zero paid APIs, zero cloud AI subscriptions, and no mandatory Docker containers for development.
 
 ### Prerequisites
 - **Python 3.11+**
@@ -31,232 +73,187 @@ CivicTrace requires zero paid APIs, zero cloud AI subscriptions, and no mandator
 ### 1. Backend Setup
 
 ```bash
-# From repository root:
-# 1. Activate virtual environment (or create with python -m venv .venv)
-.\.venv\Scripts\activate   # (On Linux/macOS: source .venv/bin/activate)
+# 1. Clone repository and navigate to root:
+git clone https://github.com/Rhythm-Sanghi/CivicTrace.git
+cd CivicTrace
 
-# 2. Install dependencies
-pip install -r services/api/requirements.txt  # or pip install fastapi uvicorn sqlalchemy alembic pydantic bcrypt pyjwt httpx pytest
+# 2. Create and activate a Python virtual environment:
+python -m venv .venv
+# On Windows (PowerShell):
+.\.venv\Scripts\Activate.ps1
+# On Linux / macOS:
+source .venv/bin/activate
 
-# 3. Initialize environment file
+# 3. Install backend dependencies:
+pip install -r services/api/requirements.txt
+
+# 4. Initialize environment configuration:
 cp .env.example .env
 
-# 4. Seed the database with realistic demonstration scenarios
+# 5. Seed demonstration accounts and scenarios:
 cd services/api
 python -m app.db.seed
 
-# 5. Start the FastAPI backend server
+# 6. Start the FastAPI development server:
 uvicorn app.main:app --reload --port 8000
 ```
-API Documentation will be live at: **`http://localhost:8000/api/v1/docs`** (ReDoc: **`http://localhost:8000/api/v1/redoc`**)
+
+The interactive OpenAPI documentation is available at `http://localhost:8000/api/v1/docs` (ReDoc: `http://localhost:8000/api/v1/redoc`).
 
 ---
 
 ### 2. Frontend Setup
 
+In a separate terminal window:
+
 ```bash
-# In a new terminal, navigate to apps/web:
 cd apps/web
 
-# 1. Install dependencies
+# 1. Install dependencies:
 npm install
 
-# 2. Run the Vite development server
+# 2. Start the Vite development server:
 npm run dev
 ```
-CivicTrace Web Interface will be live at: **`http://localhost:5173`**
+
+The CivicTrace web application will be accessible at `http://localhost:5173`.
 
 ---
 
-### 3. Database Migrations & Schema Management
+### 3. Database Migrations
 
-CivicTrace uses Alembic for declarative schema versioning and database portability:
+CivicTrace uses Alembic for declarative schema migrations:
 
 ```bash
 cd services/api
 alembic upgrade head
 ```
 
-- **Local Demo / Development Mode:** Zero-setup table bootstrapping is supported via `AUTO_CREATE_TABLES=True`.
-- **Production Mode:** Alembic migrations (`alembic upgrade head`) are the authoritative schema mechanism. The production startup gate enforces `AUTO_CREATE_TABLES=False`.
+- **Local Demo & Development:** Table creation is supported via SQLite (`AUTO_CREATE_TABLES=True` in `.env`).
+- **Production Mode:** Alembic migrations (`alembic upgrade head`) are strictly authoritative. The production startup gate enforces `AUTO_CREATE_TABLES=False`.
 
 ---
 
-## Seeded Demonstration Accounts
+## Demonstration Accounts
 
-The database comes pre-seeded with 5 interconnected scenarios set in **Indore Central & North Ward, Madhya Pradesh, India** (illustrative municipal data):
+When seeded locally, CivicTrace includes 5 interconnected civic infrastructure scenarios set in Indore Central Ward (illustrative data):
 
-| Role | Email | Password | Access / Purpose |
+| Role | Email | Password | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Community Reviewer** | `reviewer@civictrace.local` | `ReviewerPass2026!` | Duplicate correlation desk, review overrides & case consolidation |
-| **Public Works Operator** | `lighting.operator@civictrace.local` | `OperatorPass2026!` | Logging repairs and submitting completion claims |
-| **Citizen Observer** | `citizen.aarav@civictrace.local` | `CitizenPass2026!` | Reporting defects & submitting resolution verifications |
-| **Administrator** | `admin@civictrace.local` | `AdminPass2026!` | System configuration & service area oversight |
+| **Community Reviewer** | `reviewer@civictrace.local` | `ReviewerPass2026!` | Moderation queue, duplicate adjudication, and rework dispatch |
+| **Public Works Operator** | `lighting.operator@civictrace.local` | `OperatorPass2026!` | Work assignment, in-progress logging, and resolution claims |
+| **Citizen Observer** | `citizen.aarav@civictrace.local` | `CitizenPass2026!` | Defect reporting and independent site verification |
+| **Administrator** | `admin@civictrace.local` | `AdminPass2026!` | Department administration and identity enrollment |
 
-*Note: In development and local-demo modes, the sign-in page features one-click demo credentials. In production environments (`ENVIRONMENT=production`), demo account exposure is strictly disabled and missing secret keys cause safe startup termination.*
+> **Security Note:** In local development mode, the sign-in view displays one-click buttons for demo accounts. In production builds (`import.meta.env.PROD === true`), all demo credentials and one-click controls are stripped from compiled assets by bundler dead-code elimination. The backend database seeder (`seed.py`) refuses to run when `ENVIRONMENT=production`.
 
 ---
 
-## Running Automated Tests
+## Automated Verification & Testing
 
-### Backend Automated Test Suite (Pytest)
-Run the full backend security, multiprocess concurrency, ledger authenticity attack, and workflow race test suite:
+CivicTrace maintains a comprehensive test suite across backend unit/integration tests, frontend component tests, and Chromium browser end-to-end automation.
+
+### Backend Test Suite (Pytest)
 
 ```bash
 cd services/api
-pytest app/tests/ -v
+pytest app/tests -v
 ```
 
-**75/75 tests pass**, covering:
-1. Append-only SHA-256 hash chain verification and mathematical tamper detection
-2. Deterministic Haversine spatial correlation and priority calculation
-3. Conflict of interest enforcement: operators strictly blocked from self-verifying resolution claims (`403 Forbidden`)
-4. Verification quorum and anti-sybil guard: conservative policy (`REQUIRE_TRUSTED_IDENTITY_FOR_AUTO_RESOLVE=True`) prevents ordinary accounts from auto-closing cases without reviewer sign-off; administrator identity enrollment required for verified citizen auto-resolution
-5. Contradictory dispute protection: any citizen dispute (`STILL_UNRESOLVED`) immediately forces case state into `DISPUTED`
-6. Claim cycle scoping: stale verification observations on prior disputed repair claims do not leak into new claim cycles after rework; citizens can re-verify new claims
-7. Evidence authorization gating: unapproved or pending evidence cannot be downloaded publicly by anonymous callers or third-party citizens; approval required for public distribution
-8. Path traversal confinement preventing filesystem escape outside upload storage directory
-9. Unauthorized state transition prevention via centralized `CaseStateMachine`
-10. Database-enforced atomic sequence allocators (`RPT-2026-XXXX`, `CAS-2026-XXXX`, per-case event index) via dedicated `sequence_counters` table
-11. Multiprocess concurrency: 4 concurrent OS worker processes allocating IDs with zero collisions, zero gaps, and durability across rollbacks
-12. Comprehensive workflow concurrency races (8 distinct multi-session scenarios):
-    - Concurrent duplicate candidate approval
-    - Concurrent candidate approval vs rejection race
-    - Case assignment vs operator transition race
-    - Multiple concurrent resolution claims (enforced by partial unique DB index `uq_active_resolution_claim_per_case`)
-    - Concurrent positive observation vs dispute observation
-    - Simultaneous automatic-closure attempts
-    - Evidence upload vs report moderation rejection
-    - Concurrent event ledger appends
-13. Complete ledger authenticity attacks (13 vectors tested across `FILE_INTEGRITY` and `TRUSTED_AUTHENTICITY` modes):
-    - Payload event modification
-    - Actor metadata modification
-    - Event reordering
-    - Intermediate event deletion
-    - Final event deletion
-    - Multiple final events truncation
-    - Complete forged hash chain recalculation
-    - Signer key replacement attack
-    - Stale valid export replay
-    - Direct database tampering of actor identity
-    - Direct database tampering of event timestamp
-    - Direct database tampering of public actor label
-    - Historical schema version 1 backward compatibility preservation
-14. Atomic backup & recovery security (4 comprehensive operational scenarios):
-    - Strict exclusion of private signing keys and credentials from application archives
-    - Point-in-time consistency during concurrent upload races, temporary fragments (.tmp, .part), and uncommitted files
-    - Discrimination between accidental disk/transfer corruption (SHA-256) and malicious archive replacement (Ed25519 signature)
-    - Controlled, encrypted key backup lifecycle using PBKDF2-HMAC-SHA256 and AES-256-GCM
-15. In-memory sliding-window IP rate limiting with thread safety, prune intervals, and deterministic test clock
-16. Reverse proxy header trust guard: `X-Forwarded-For` ignored unless `BEHIND_PROXY` is enabled and request originates from a trusted peer
-17. Strict file magic bytes inspection (JPEG, PNG, WEBP, PDF) and 10MB streaming size validation
-18. Full lifecycle end-to-end integration flow
-19. Fail-closed ZIP export package verification (`FILE_INTEGRITY` vs `TRUSTED_AUTHENTICITY`) with Ed25519 signature checks
-20. Guest upload capability tokens: cryptographically secure token generation, SHA-256 database hashing, constant-time verification, 120-min expiry, and automatic revocation on moderation rejection
-21. Database-backed session revocation (`revoked_tokens` table) with cross-process consistency and token expiry cleanup
-22. Reviewer pending report moderation queue and production moderation defaults (`REQUIRE_REPORT_MODERATION=True`)
-23. Statistical median computation for even-length distributions
-24. Hard bcrypt 72-byte password length validation preventing silent password truncation
-25. Constant-time dummy password hashing on authentication failures preventing account enumeration timing attacks
-26. HttpOnly cookie session support with explicit `/auth/logout` revocation
-27. Health check probe and service status reporting
-28. Fail-safe disposable test database configuration guard preventing execution against development or production databases
-29. Genuine PostgreSQL/PostGIS integration coverage: role boundaries, case lifecycle, duplicate adjudication, resolution claim unique constraints, cross-session token revocation, concurrent ledger writes, and schema migration correctness from empty to populated schemas
+**77/77 tests passing** across two test configurations:
+- **SQLite Engine Runner:** Validates in-memory and file-based state machine transitions, SHA-256 ledger chaining, multi-process sequence allocators, rate limiting, and backup recovery.
+- **PostgreSQL & PostGIS Runner:** Executed against PostgreSQL 16 in CI (`backend-postgres-test`). Validates PostgreSQL dialect behavior, role boundaries, partial unique index constraints (`uq_active_resolution_claim_per_case`), cross-session token revocation, concurrent ledger writes, and schema migrations from empty to populated schemas.
+
+Key test areas:
+1. **Ledger Integrity & Attack Vectors (13 tests):** SHA-256 hash chaining, Schema v2 canonicalization, actor identity modification detection, timestamp backdating detection, event reordering, and Ed25519 signature verification.
+2. **Workflow Concurrency Races (8 tests):** Concurrent duplicate candidate approval, approval vs rejection race, assignment vs transition race, multiple concurrent resolution claims, observation races, and ledger appends.
+3. **Backup & Recovery Security (7 tests):** Coordinated database and evidence snapshots, encrypted key backup lifecycle (AES-256-GCM + PBKDF2), corrupted archive detection, and uncommitted file handling.
+4. **Access Control & Safety (15 tests):** Department boundaries, operator self-verification blocking, CSRF Double Submit token validation, HttpOnly cookie authentication, rate limiting, and destructive test target prevention.
+5. **Credential & Seeding Isolation (2 tests):** Confirms demo seeding refuses production environments and production JavaScript builds exclude demo credentials.
 
 ### Frontend Component Tests (Vitest)
+
 ```bash
 cd apps/web
 npm run test
 ```
-**7/7 tests pass**, covering:
-- Layout and navigation components
-- CivicTrace Workshop and gridline design tokens
-- Local storage token isolation
-- Authentication error handling
-- Reviewer moderation workspace interactions
-- Case state transitions and dispatch controls
-- Upload boundary restrictions and dispute handling
 
-### End-to-End Browser Automation & Verification (Playwright)
+**8/8 tests passing**, covering layout rendering, accessible landmarks, 320px viewport stacking, design tokens, session storage isolation, and production credential suppression.
+
+### Frontend Linter (oxlint)
+
+```bash
+cd apps/web
+npm run lint
+```
+
+**0 errors, 0 warnings** across all 20 source files.
+
+### End-to-End Browser Lifecycle (Playwright)
+
 ```bash
 python scripts/run_browser_e2e.py
 ```
-Executes genuine headless Chromium browser workflows covering the entire 14-step civic lifecycle on a disposable database:
-- Citizen registration & login
-- Report submission & evidence upload
-- Pending moderation boundary containment
-- Reviewer moderation approval via UI
-- Department dispatch & operator claim submission via UI
-- Citizen dispute observation & closure blocking via UI
-- Reviewer adjudication & rework ordering via UI
-- Subsequent resolution confirmation
-- Signed evidence export & offline verification
-- Session logout & token replay rejection
-- Department boundary isolation (unauthorized operator blocked HTTP 403)
-- Evidence package tamper rejection
-- Accessibility verification: 320px mobile viewport, keyboard focus traversal, and 200% zoom rendering
+
+Executes a 14-step workflow in headless Chromium on a clean database:
+1. Citizen registration and portal login
+2. Defect report submission and evidence upload
+3. Quarantine of pending reports from unauthorized public view
+4. Reviewer moderation approval and public case creation
+5. Case verification and department assignment
+6. Operator sign-in and progress transition
+7. Formal resolution claim submission (`Awaiting Verification`)
+8. Citizen inspection and dispute filing (`Disputed`)
+9. Closure blocked while dispute is unresolved
+10. Reviewer dispute adjudication and rework dispatch
+11. Subsequent repair claim and confirmation (`Resolved`)
+12. Signed evidence archive export and offline verification
+13. Session logout and revoked token replay rejection
+14. Security & accessibility checks: foreign operator rejection (HTTP 403), archive tampering detection, 320px viewport rendering, keyboard tab navigation, and 200% zoom scaling.
 
 ---
 
-## 🛠️ Operational & Release Tooling
+## Operational Tooling
 
-### Backup, Restore & Key Rotation Utility (`scripts/backup_restore.py`)
-CivicTrace includes a unified operational management tool for coordinated database and evidence storage backups:
+CivicTrace includes a unified command-line tool for atomic backups, recovery, and key lifecycle management (`scripts/backup_restore.py`):
 
 ```bash
-# 1. Atomic coordinated backup of database and uploaded evidence
-python scripts/backup_restore.py backup --db-path services/api/civictrace_dev.db --uploads-dir services/api/storage/uploads --out-dir backups/
+# 1. Create atomic coordinated backup of database and evidence (TAR.GZ archive):
+python scripts/backup_restore.py backup --out backups/civictrace_backup.tar.gz --db services/api/civictrace_dev.db --uploads services/api/storage/uploads
 
-# 2. Integrity-verified restore to a target location
-python scripts/backup_restore.py restore --archive backups/civictrace_backup_20261013_104500.zip --db-target restored/civictrace_dev.db --uploads-target restored/uploads/
+# 2. Restore and verify an atomic backup:
+python scripts/backup_restore.py restore --archive backups/civictrace_backup.tar.gz --target-dir ./restored --expected-public-key <BASE64_PUBLIC_KEY>
 
-# 3. Clean up unreferenced or orphaned uploaded evidence files
-python scripts/backup_restore.py cleanup-uploads --db-path services/api/civictrace_dev.db --uploads-dir services/api/storage/uploads/
+# 3. Create encrypted backup of signing keys (PBKDF2-HMAC-SHA256 + AES-256-GCM):
+python scripts/backup_restore.py backup-keys --out keys_backup.enc --passphrase-env KEY_BACKUP_PASSPHRASE
 
-# 4. Generate or rotate Ed25519 evidence signing keys with automatic timestamped backup
-python scripts/backup_restore.py rotate-key --keys-dir services/api/storage/keys/
+# 4. Restore encrypted signing keys:
+python scripts/backup_restore.py restore-keys --archive keys_backup.enc --passphrase-env KEY_BACKUP_PASSPHRASE --target-dir ./keys
+
+# 5. Rotate Ed25519 signing key with automatic backup:
+python scripts/backup_restore.py rotate-key --keyfile services/api/storage/keys/signing_key.hex
+
+# 6. Clean up interrupted upload fragments:
+python scripts/backup_restore.py cleanup-interrupted --uploads services/api/storage/uploads --db services/api/civictrace_dev.db --dry-run
 ```
 
----
-## Release Readiness Assessment
+*Note on archive formats: Operational system backups use `.tar.gz` archives with integrity manifests. Case evidence exports generated via the API or web portal use portable `.zip` archives with JSON timelines and SHA-256 asset manifests.*
 
-| Deployment Tier | Status | Rationale |
+---
+
+## Release Readiness
+
+| Tier | Status | Rationale |
 | :--- | :--- | :--- |
-| **Local Demo** | **READY** | Zero configuration required; SQLite atomic sequences, 63/63 automated backend tests, 7/7 frontend tests, 14-step user-driven browser verification, and offline mock map work out of the box. |
-| **Hackathon Demo** | **READY** | Fully functional evidence lifecycle, append-only cryptographic ledger, tamper detection, reviewer moderation desk, and responsive CivicTrace Workshop UI. |
-| **Private Pilot** | **CONDITIONALLY READY** | Requires deployment with PostgreSQL 16 / PostGIS container, production environment variables (`ENVIRONMENT=production`), dedicated external keypair storage, and reverse proxy with TLS termination. |
-| **Public Production** | **NOT READY** | Requires distributed rate limiting (e.g. Redis/Valkey), official municipal single sign-on / national ID integration (Aadhaar / DigiLocker / eID), anti-DDoS / WAF protection, and virus/malware scanner integration on binary uploads. |
+| **Local Demo** | **READY** | Zero external dependencies; SQLite atomic sequences, 77 automated backend tests, 8 frontend tests, 14-step Chromium verification, and offline Indore map schema work out of the box. |
+| **Hackathon Demo** | **READY** | Fully functional evidence lifecycle, append-only cryptographic ledger, tamper detection, reviewer moderation desk, and responsive Workshop UI. |
+| **Private Pilot** | **CONDITIONALLY READY** | Requires PostgreSQL 16 + PostGIS container, production environment configuration (`ENVIRONMENT=production`), dedicated external keypair storage, and reverse proxy with TLS termination. |
+| **Public Production** | **NOT READY** | Accepted limitations: requires distributed multi-node rate limiting (e.g. Redis), official municipal single sign-on / national ID integration (e.g. DigiLocker / Aadhaar / eID), anti-DDoS / WAF protection, and virus scanning on uploaded binary assets. |
 
 ---
 
-## Repository Default Branch Configuration
+## Contributing & License
 
-The remote repository default branch is currently set to `master`. To align with standard modern conventions and make `main` the authoritative default branch on GitHub:
+CivicTrace is licensed under the **Apache License, Version 2.0**. See [`LICENSE`](LICENSE) for full terms.
 
-1. **Via GitHub Web UI:**
-   - Navigate to the repository on GitHub: `https://github.com/Rhythm-Sanghi/CivicTrace`
-   - Go to **Settings** > **General** > **Default branch**
-   - Click the switch icon (⇄) next to `master`
-   - Select `main` from the dropdown list and click **Update**
-   - Confirm the prompt to switch the default branch to `main`.
-2. **Via GitHub CLI (`gh`):**
-   ```bash
-   gh repo edit Rhythm-Sanghi/CivicTrace --default-branch main
-   ```
-*(Do not delete the `master` branch until confirmed and approved).*
-
----
-
-## Visual Identity
-
-CivicTrace follows the **CivicTrace Workshop Design System** (Workshop + Gridline + Studio Utility):
-- **Workshop:** Purposeful density, clear tools, and honest controls.
-- **Gridline:** Ruled tables, baseline rhythm, aligned columns, and fine separators.
-- **Studio Utility:** Light canvas `#f4f4f1`, warm brass accent `#795f2f`, soft beige selection `#e9e2d2`, and clean typography (`Segoe UI` + `Cascadia Mono`).
-
----
-
-## License & Compliance
-
-Licensed under the **Apache License, Version 2.0**. See [`LICENSE`](LICENSE) for details.
-CivicTrace does not require or bundle proprietary Google Maps or Mapbox API keys. Demonstrations use an offline schematic map model of Indore Ward 34 with illustrative municipal records.
+Issues, bug reports, and pull requests should be submitted against the `main` branch. All pull requests must pass the complete GitHub Actions CI pipeline (SQLite tests, PostgreSQL migrations and integration tests, frontend lint and build, and Playwright Chromium E2E).
