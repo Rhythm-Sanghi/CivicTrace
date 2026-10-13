@@ -21,11 +21,10 @@ from app.models.entities import (
     ResolutionClaim,
     DuplicateCandidate,
     RevokedToken,
-    utc_now,
 )
 from app.services.state_machine import CaseStateMachine
 from app.services.ledger import LedgerService
-from app.core.security import clean_expired_revoked_tokens
+from app.core.security import clean_expired_revoked_tokens, create_access_token
 from app.tests.conftest import validate_test_database_safety, TestingSessionLocal, TEST_DB_URL
 
 
@@ -33,9 +32,11 @@ def test_safety_guard_rejects_unsafe_databases():
     """
     Safety Guard Verification:
     validate_test_database_safety MUST fail closed and refuse execution if:
-    - Target is a production database.
-    - Target is the development SQLite database (civictrace_dev.db).
-    - Target is an unconfirmed PostgreSQL database (lacking 'test' in its name).
+    - Target is a production or staging database.
+    - Target is a development database.
+    - Target is a default system database (postgres, template1, etc.).
+    - Target is a database merely containing the substring 'test' within another word.
+    - Target is an unconfirmed SQLite database.
     """
     # 1. Rejects production URLs (even if 'test' is included in the name)
     with pytest.raises(RuntimeError, match="SAFETY ABORT"):
@@ -60,15 +61,37 @@ def test_safety_guard_rejects_unsafe_databases():
     with pytest.raises(RuntimeError, match="SAFETY ABORT"):
         validate_test_database_safety("postgresql://user:pass@localhost:5432/civictrace_dev_test")
 
-    # 3. Rejects PostgreSQL database without 'test' in the DB name
+    # 3. Rejects default system databases
     with pytest.raises(RuntimeError, match="SAFETY ABORT"):
-        validate_test_database_safety("postgresql://user:pass@localhost:5432/civictrace")
+        validate_test_database_safety("postgresql://user:pass@localhost:5432/postgres")
 
-    # 4. Allows verified test database URLs
+    with pytest.raises(RuntimeError, match="SAFETY ABORT"):
+        validate_test_database_safety("postgresql://user:pass@localhost:5432/template1")
+
+    # 4. Rejects databases with 'test' merely as a substring inside an unrelated word
+    with pytest.raises(RuntimeError, match="SAFETY ABORT"):
+        validate_test_database_safety("postgresql://user:pass@localhost:5432/latest_orders")
+
+    with pytest.raises(RuntimeError, match="SAFETY ABORT"):
+        validate_test_database_safety("postgresql://user:pass@localhost:5432/contest")
+
+    with pytest.raises(RuntimeError, match="SAFETY ABORT"):
+        validate_test_database_safety("postgresql://user:pass@localhost:5432/protest")
+
+    # 5. Rejects SQLite databases without test boundary
+    with pytest.raises(RuntimeError, match="SAFETY ABORT"):
+        validate_test_database_safety("sqlite:///./orders.db")
+
+    with pytest.raises(RuntimeError, match="SAFETY ABORT"):
+        validate_test_database_safety("sqlite:///./contest.db")
+
+    # 6. Allows explicitly verified dedicated test database URLs
     validate_test_database_safety("sqlite:///./test_disposable.db")
     validate_test_database_safety("sqlite:///:memory:")
     validate_test_database_safety("postgresql://user:pass@localhost:5432/civictrace_test")
     validate_test_database_safety("postgresql://user:pass@localhost:5432/test_civictrace")
+    validate_test_database_safety("postgresql://user:pass@localhost:5432/test")
+    validate_test_database_safety("postgresql://user:pass@localhost:5432/test_db")
 
 
 def test_integration_authorization_and_role_boundaries(db_session, client):
@@ -205,11 +228,17 @@ def test_integration_case_lifecycle_and_state_machine(db_session):
     assert count == 4
 
 
-def test_integration_duplicate_adjudication_and_consolidation(db_session):
+def test_integration_duplicate_adjudication_and_consolidation(db_session, client):
     """
     Integration Verification: Duplicate candidate adjudication and report consolidation.
-    Ensures approving a duplicate attaches report to target case, updates priority,
-    and transitions conflicting duplicate candidates to SUPERSEDED.
+    Exercises genuine production endpoint POST /api/v1/reports/duplicates/{candidate_id}/decision.
+    Confirms:
+    - Role authorization (CITIZEN blocked 403, REVIEWER permitted 200).
+    - Validation error rejection (invalid decision returns 400/422).
+    - Candidate status transition to APPROVED with reviewer attribution.
+    - Automatic domain supersession of conflicting duplicate candidates to SUPERSEDED.
+    - Report re-parenting to target case.
+    - Cryptographic event append to target case ledger (CASE_CONSOLIDATED_DUPLICATE_REPORT) with intact hash chain.
     """
     suffix = uuid.uuid4().hex[:6]
     cat = IssueCategory(name=f"Signals {suffix}", code=f"SIG-{suffix}", default_severity_weight=1.5)
@@ -219,7 +248,13 @@ def test_integration_duplicate_adjudication_and_consolidation(db_session):
         display_name="Reviewer Dup",
         role=UserRole.REVIEWER,
     )
-    db_session.add_all([cat, reviewer])
+    citizen = User(
+        email=f"cit_dup_{suffix}@test.local",
+        hashed_password="hash",
+        display_name="Citizen Dup",
+        role=UserRole.CITIZEN,
+    )
+    db_session.add_all([cat, reviewer, citizen])
     db_session.commit()
 
     case_target = Case(
@@ -288,24 +323,52 @@ def test_integration_duplicate_adjudication_and_consolidation(db_session):
     db_session.add_all([cand1, cand2])
     db_session.commit()
 
-    # Approve candidate 1 -> links report to case_target
-    cand1.status = "APPROVED"
-    cand1.reviewed_by_id = reviewer.id
-    cand1.reviewed_at = utc_now()
-    report.case_id = case_target.id
+    citizen_token = create_access_token(citizen.id)
+    reviewer_token = create_access_token(reviewer.id)
 
-    # Conflicting candidate 2 automatically marked SUPERSEDED
-    cand2.status = "SUPERSEDED"
-    db_session.commit()
+    # 1. Authorization check: Citizen cannot adjudicate duplicate candidates (403 Forbidden)
+    res_unauth = client.post(
+        f"/api/v1/reports/duplicates/{cand1.id}/decision",
+        json={"decision": "APPROVE"},
+        headers={"Authorization": f"Bearer {citizen_token}"},
+    )
+    assert res_unauth.status_code == 403
 
-    # Assert database state
+    # 2. Validation check: Invalid decision rejected (400/422), transaction rolled back
+    res_invalid = client.post(
+        f"/api/v1/reports/duplicates/{cand1.id}/decision",
+        json={"decision": "INVALID_CHOICE"},
+        headers={"Authorization": f"Bearer {reviewer_token}"},
+    )
+    assert res_invalid.status_code in (400, 422)
+
+    # 3. Authentic reviewer approval via production endpoint
+    res_approve = client.post(
+        f"/api/v1/reports/duplicates/{cand1.id}/decision",
+        json={"decision": "APPROVE", "notes": "Approved duplicate correlation by reviewer"},
+        headers={"Authorization": f"Bearer {reviewer_token}"},
+    )
+    assert res_approve.status_code == 200
+    resp_data = res_approve.json()
+    assert resp_data["status"] == "APPROVED"
+
+    # 4. Assert database state reflects domain workflow
+    db_session.expire_all()
     reloaded_cand1 = db_session.query(DuplicateCandidate).filter(DuplicateCandidate.id == cand1.id).first()
     reloaded_cand2 = db_session.query(DuplicateCandidate).filter(DuplicateCandidate.id == cand2.id).first()
     reloaded_rep = db_session.query(Report).filter(Report.id == report.id).first()
+    reloaded_target = db_session.query(Case).filter(Case.id == case_target.id).first()
 
     assert reloaded_cand1.status == "APPROVED"
+    assert reloaded_cand1.reviewed_by_id == reviewer.id
     assert reloaded_cand2.status == "SUPERSEDED"
     assert reloaded_rep.case_id == case_target.id
+    assert reloaded_target is not None
+
+    # 5. Verify cryptographic ledger audit event appended to target case
+    valid_chain, count, err, _ = LedgerService.verify_chain(db_session, case_target.id)
+    assert valid_chain is True, f"Target case ledger chain broken: {err}"
+    assert count >= 1
 
 
 def test_integration_resolution_claims_unique_active_constraint(db_session):

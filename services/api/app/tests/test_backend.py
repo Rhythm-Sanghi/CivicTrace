@@ -1,7 +1,8 @@
+import uuid
 from app.services.ledger import LedgerService
 from app.services.duplicate_engine import haversine_distance_meters
 from app.services.export_service import ExportService
-from app.models.entities import Case
+from app.models.entities import Case, IssueCategory
 
 
 
@@ -18,10 +19,19 @@ def test_haversine_formula():
 
 
 def test_append_only_ledger_hash_chaining(db_session):
+    suffix = uuid.uuid4().hex[:6]
+    cat = IssueCategory(
+        name=f"Ledger Broken Light {suffix}",
+        code=f"CAT-LEDGER-{suffix}",
+        default_severity_weight=2.0,
+    )
+    db_session.add(cat)
+    db_session.commit()
+
     # Create test case
     case = Case(
-        public_id="TEST-CAS-001",
-        category_id="fake-cat",
+        public_id=f"TEST-CAS-{suffix.upper()}",
+        category_id=cat.id,
         title="Test Ledger Broken Light",
         description="Testing cryptographic chain",
         latitude=22.7,
@@ -57,9 +67,18 @@ def test_append_only_ledger_hash_chaining(db_session):
 
 
 def test_export_package_and_manifest_tamper_detection(db_session):
+    suffix = uuid.uuid4().hex[:6]
+    cat = IssueCategory(
+        name=f"Export Test Category {suffix}",
+        code=f"CAT-EXP-{suffix}",
+        default_severity_weight=1.5,
+    )
+    db_session.add(cat)
+    db_session.commit()
+
     case = Case(
-        public_id="TEST-EXP-001",
-        category_id="cat-exp",
+        public_id=f"TEST-EXP-{suffix.upper()}",
+        category_id=cat.id,
         title="Export Test Case",
         description="Testing ZIP export manifest",
         latitude=22.7,

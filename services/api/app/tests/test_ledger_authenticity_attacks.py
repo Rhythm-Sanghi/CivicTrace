@@ -1,4 +1,5 @@
 import json
+import uuid
 import zipfile
 import hashlib
 from datetime import datetime, timezone
@@ -494,20 +495,31 @@ def test_db_tamper_actor_identity_detected(db_session):
     """
     Direct Database Tampering Test:
     An attacker directly updates the `actor_id` of a ledger event in the database,
-    leaving the event payload completely unchanged.
-    `verify_chain` MUST detect the tampering and fail verification.
+    substituting another genuinely existing user account, while leaving the event payload completely unchanged.
+    PostgreSQL permits this modification under Foreign Key constraints, but
+    `LedgerService.verify_chain()` MUST detect the cryptographic tampering under schema v2 canonicalization.
     """
     case, _ = _create_test_case_with_ledger(db_session)
     valid, total, err, _ = LedgerService.verify_chain(db_session, case.id)
     assert valid is True
     assert total == 4
 
+    # Create a second valid user to satisfy PostgreSQL foreign key constraint
+    rogue_user = User(
+        email=f"rogue_{uuid.uuid4().hex[:6]}@civictrace.local",
+        hashed_password="hash",
+        display_name="Rogue Actor",
+        role=UserRole.OPERATOR,
+    )
+    db_session.add(rogue_user)
+    db_session.commit()
+
     ev2 = (
         db_session.query(CaseEvent)
         .filter(CaseEvent.case_id == case.id, CaseEvent.event_index == 2)
         .first()
     )
-    ev2.actor_id = "00000000-0000-0000-0000-000000000099"
+    ev2.actor_id = rogue_user.id
     db_session.commit()
 
     valid_after, total_after, err_after, _ = LedgerService.verify_chain(db_session, case.id)
@@ -559,9 +571,14 @@ def test_db_tamper_public_label_detected(db_session):
 
 def test_historical_schema_v1_events_remain_verifiable(db_session):
     """
-    Backward Compatibility Test:
+    Backward Compatibility & Accepted Limitation Verification:
     Ensures historical events recorded under Schema Version 1 continue to verify
     accurately under legacy canonicalization rules.
+    ACCEPTED LIMITATION:
+    Schema Version 1 preimages do not bind actor identity or created_at timestamps.
+    Historical v1 events remain mathematically verifiable for backward compatibility,
+    but do not acquire the stronger actor/timestamp non-repudiation guarantees
+    enforced by Schema Version 2 events.
     """
     import uuid
 
