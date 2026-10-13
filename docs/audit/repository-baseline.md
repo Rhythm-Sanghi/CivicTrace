@@ -13,7 +13,7 @@ CivicTrace is an open-source civic accountability platform pairing public infras
 
 The application has a functioning full-stack implementation:
 - **Backend:** FastAPI, SQLAlchemy 2.0, SQLite (development/demo) / PostgreSQL/PostGIS (architecture target), Pydantic v2, JWT authentication, and SHA-256 state ledger hashing.
-- **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Lucide icons, styled strictly in the *Benchlight* (Workshop + Gridline + Studio Utility) design system.
+- **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Lucide icons, styled strictly in the *CivicTrace Workshop* (Workshop + Gridline + Studio Utility) design system.
 - **Verification:** Vitest frontend unit tests, Pytest backend unit/integration tests, and 14-stage Playwright end-to-end browser workflows.
 
 This audit establishes the baseline findings across reproducibility, security, concurrency, verification mechanics, and usability before systematic hardening.
@@ -85,6 +85,6 @@ This audit establishes the baseline findings across reproducibility, security, c
 - **Phase A (Completed):** Root `.gitignore` repair, `apps/web/src/lib/api.ts` tracking restoration, backend dependency declarations (`requirements.txt`, `pyproject.toml`), baseline audit report.
 - **Phase B (Next):** Security, Privacy & Authorization Matrix hardening (moderation lifecycle, upload magic bytes validation, asset access control, rate limiting).
 - **Phase C:** Concurrency, state machine centralization, collision-free identifiers, export allowlist sanitization, and SHA-256 ledger verification.
-- **Phase D:** Frontend contract alignment, plain human-centered civic terminology overhaul, and Benchlight UI polish.
+- **Phase D:** Frontend contract alignment, plain human-centered civic terminology overhaul, and CivicTrace Workshop UI polish.
 - **Phase E:** Backend and frontend test coverage expansion, Playwright E2E verification, CI workflow modernization.
 - **Phase F:** Comprehensive README overhaul, clean setup scripts, removal of dead code/stale documentation.

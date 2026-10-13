@@ -54,7 +54,7 @@ export const ReportIssueView: React.FC = () => {
   useEffect(() => {
     api.getCategories().then((cats) => {
       setCategories(cats);
-      if (cats.length > 0 && !categoryId) setCategoryId(cats[0].id);
+      if (cats.length > 0) setCategoryId((prev) => prev || cats[0].id);
     });
   }, []);
 

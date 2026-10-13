@@ -1,3 +1,4 @@
+import enum
 from datetime import datetime
 from typing import Optional, List, Dict
 from pydantic import BaseModel, Field, ConfigDict
@@ -37,6 +38,31 @@ class UserPublic(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ApprovedVerificationMethod(str, enum.Enum):
+    MUNICIPAL_DESK_IN_PERSON = "MUNICIPAL_DESK_IN_PERSON"
+    RESIDENCY_AFFIDAVIT_INSPECTION = "RESIDENCY_AFFIDAVIT_INSPECTION"
+    COMMUNITY_VOUCHING_SUPERVISION = "COMMUNITY_VOUCHING_SUPERVISION"
+    OFFICIAL_SERVICE_CREDENTIAL = "OFFICIAL_SERVICE_CREDENTIAL"
+
+
+class IdentityEnrollmentRequest(BaseModel):
+    verification_method: ApprovedVerificationMethod = Field(
+        ...,
+        description="Approved local/civic verification method (privacy-preserving, no mandatory commercial/state ID API required)",
+    )
+    enrollment_reason: str = Field(
+        ...,
+        min_length=10,
+        max_length=500,
+        description="Auditable justification for granting identity assurance",
+    )
+    auditor_notes: Optional[str] = Field(
+        None,
+        max_length=1000,
+        description="Optional municipal audit notes or evidence reference",
+    )
 
 
 class Token(BaseModel):

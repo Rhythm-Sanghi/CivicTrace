@@ -107,7 +107,7 @@ cd services/api
 pytest app/tests/ -v
 ```
 
-**55/55 tests pass**, covering:
+**63/63 tests pass**, covering:
 1. Append-only SHA-256 hash chain verification and mathematical tamper detection
 2. Deterministic Haversine spatial correlation and priority calculation
 3. Conflict of interest enforcement: operators strictly blocked from self-verifying resolution claims (`403 Forbidden`)
@@ -128,7 +128,7 @@ pytest app/tests/ -v
     - Simultaneous automatic-closure attempts
     - Evidence upload vs report moderation rejection
     - Concurrent event ledger appends
-13. Complete ledger authenticity attacks (9 vectors tested across `FILE_INTEGRITY` and `TRUSTED_AUTHENTICITY` modes):
+13. Complete ledger authenticity attacks (13 vectors tested across `FILE_INTEGRITY` and `TRUSTED_AUTHENTICITY` modes):
     - Payload event modification
     - Actor metadata modification
     - Event reordering
@@ -138,19 +138,28 @@ pytest app/tests/ -v
     - Complete forged hash chain recalculation
     - Signer key replacement attack
     - Stale valid export replay
-14. In-memory sliding-window IP rate limiting with thread safety, prune intervals, and deterministic test clock
-15. Reverse proxy header trust guard: `X-Forwarded-For` ignored unless `BEHIND_PROXY` is enabled and request originates from a trusted peer
-16. Strict file magic bytes inspection (JPEG, PNG, WEBP, PDF) and 10MB streaming size validation
-17. Full lifecycle end-to-end integration flow
-18. Fail-closed ZIP export package verification (`FILE_INTEGRITY` vs `TRUSTED_AUTHENTICITY`) with Ed25519 signature checks
-19. Guest upload capability tokens: cryptographically secure token generation, SHA-256 database hashing, constant-time verification, 120-min expiry, and automatic revocation on moderation rejection
-20. Database-backed session revocation (`revoked_tokens` table) with cross-process consistency and token expiry cleanup
-21. Reviewer pending report moderation queue and production moderation defaults (`REQUIRE_REPORT_MODERATION=True`)
-22. Statistical median computation for even-length distributions
-23. Hard bcrypt 72-byte password length validation preventing silent password truncation
-24. Constant-time dummy password hashing on authentication failures preventing account enumeration timing attacks
-25. HttpOnly cookie session support with explicit `/auth/logout` revocation
-26. Health check probe and service status reporting
+    - Direct database tampering of actor identity
+    - Direct database tampering of event timestamp
+    - Direct database tampering of public actor label
+    - Historical schema version 1 backward compatibility preservation
+14. Atomic backup & recovery security (4 comprehensive operational scenarios):
+    - Strict exclusion of private signing keys and credentials from application archives
+    - Point-in-time consistency during concurrent upload races, temporary fragments (.tmp, .part), and uncommitted files
+    - Discrimination between accidental disk/transfer corruption (SHA-256) and malicious archive replacement (Ed25519 signature)
+    - Controlled, encrypted key backup lifecycle using PBKDF2-HMAC-SHA256 and AES-256-GCM
+15. In-memory sliding-window IP rate limiting with thread safety, prune intervals, and deterministic test clock
+16. Reverse proxy header trust guard: `X-Forwarded-For` ignored unless `BEHIND_PROXY` is enabled and request originates from a trusted peer
+17. Strict file magic bytes inspection (JPEG, PNG, WEBP, PDF) and 10MB streaming size validation
+18. Full lifecycle end-to-end integration flow
+19. Fail-closed ZIP export package verification (`FILE_INTEGRITY` vs `TRUSTED_AUTHENTICITY`) with Ed25519 signature checks
+20. Guest upload capability tokens: cryptographically secure token generation, SHA-256 database hashing, constant-time verification, 120-min expiry, and automatic revocation on moderation rejection
+21. Database-backed session revocation (`revoked_tokens` table) with cross-process consistency and token expiry cleanup
+22. Reviewer pending report moderation queue and production moderation defaults (`REQUIRE_REPORT_MODERATION=True`)
+23. Statistical median computation for even-length distributions
+24. Hard bcrypt 72-byte password length validation preventing silent password truncation
+25. Constant-time dummy password hashing on authentication failures preventing account enumeration timing attacks
+26. HttpOnly cookie session support with explicit `/auth/logout` revocation
+27. Health check probe and service status reporting
 
 ### Frontend Component Tests (Vitest)
 ```bash
@@ -159,7 +168,7 @@ npm run test
 ```
 **7/7 tests pass**, covering:
 - Layout and navigation components
-- Benchlight workshop and gridline design tokens
+- CivicTrace Workshop and gridline design tokens
 - Local storage token isolation
 - Authentication error handling
 - Reviewer moderation workspace interactions
@@ -211,8 +220,8 @@ python scripts/backup_restore.py rotate-key --keys-dir services/api/storage/keys
 
 | Deployment Tier | Status | Rationale |
 | :--- | :--- | :--- |
-| **Local Demo** | **READY** | Zero configuration required; SQLite atomic sequences, 52/52 automated tests, 14-step user-driven browser verification, and offline mock map work out of the box. |
-| **Hackathon Demo** | **READY** | Fully functional evidence lifecycle, append-only cryptographic ledger, tamper detection, reviewer moderation desk, and responsive Benchlight UI. |
+| **Local Demo** | **READY** | Zero configuration required; SQLite atomic sequences, 63/63 automated backend tests, 7/7 frontend tests, 14-step user-driven browser verification, and offline mock map work out of the box. |
+| **Hackathon Demo** | **READY** | Fully functional evidence lifecycle, append-only cryptographic ledger, tamper detection, reviewer moderation desk, and responsive CivicTrace Workshop UI. |
 | **Private Pilot** | **CONDITIONALLY READY** | Requires deployment with PostgreSQL 16 / PostGIS container, production environment variables (`ENVIRONMENT=production`), dedicated external keypair storage, and reverse proxy with TLS termination. |
 | **Public Production** | **NOT READY** | Requires distributed rate limiting (e.g. Redis/Valkey), official municipal single sign-on / national ID integration (Aadhaar / DigiLocker / eID), anti-DDoS / WAF protection, and virus/malware scanner integration on binary uploads. |
 
@@ -238,7 +247,7 @@ The remote repository default branch is currently set to `master`. To align with
 
 ## Visual Identity
 
-CivicTrace follows the **Benchlight Design System** (Workshop + Gridline + Studio Utility):
+CivicTrace follows the **CivicTrace Workshop Design System** (Workshop + Gridline + Studio Utility):
 - **Workshop:** Purposeful density, clear tools, and honest controls.
 - **Gridline:** Ruled tables, baseline rhythm, aligned columns, and fine separators.
 - **Studio Utility:** Light canvas `#f4f4f1`, warm brass accent `#795f2f`, soft beige selection `#e9e2d2`, and clean typography (`Segoe UI` + `Cascadia Mono`).

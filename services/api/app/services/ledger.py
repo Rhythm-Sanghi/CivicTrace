@@ -1,7 +1,8 @@
 import hashlib
-from typing import Optional, Dict, Any, Tuple
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any, Tuple, Union
 from sqlalchemy.orm import Session
-from app.models.entities import Case, CaseEvent, User, IntegrityCheckpoint
+from app.models.entities import Case, CaseEvent, User, IntegrityCheckpoint, utc_now
 from app.core.security import canonical_json
 from app.services.crypto_signer import SignerService
 
@@ -9,6 +10,53 @@ GENESIS_PREVIOUS_HASH = "0" * 64
 
 
 class LedgerService:
+    @staticmethod
+    def canonical_iso_timestamp(dt: Union[datetime, str]) -> str:
+        if isinstance(dt, str):
+            dt = datetime.fromisoformat(dt)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt.isoformat()
+
+    @staticmethod
+    def compute_event_hash(
+        schema_version: int,
+        previous_event_hash: str,
+        case_id: str,
+        event_index: int,
+        event_type: str,
+        actor_id: Optional[str],
+        public_actor_label: str,
+        created_at: Union[datetime, str],
+        payload_json: str,
+    ) -> str:
+        if schema_version == 1:
+            # Historical Schema Version 1 (preserves backward compatibility and verification of existing records)
+            hash_preimage = f"{previous_event_hash}|{case_id}|{event_index}|{event_type}|{payload_json}"
+            return hashlib.sha256(hash_preimage.encode("utf-8")).hexdigest()
+        elif schema_version == 2:
+            # Schema Version 2: Cryptographically binds actor identity, public actor label,
+            # canonical ISO 8601 UTC timestamp, event type, case ID, event index, payload,
+            # schema version, and previous event hash.
+            ts_str = LedgerService.canonical_iso_timestamp(created_at)
+            preimage_dict = {
+                "schema_version": 2,
+                "previous_event_hash": previous_event_hash,
+                "case_id": case_id,
+                "event_index": event_index,
+                "event_type": event_type,
+                "actor_id": actor_id or "",
+                "public_actor_label": public_actor_label,
+                "timestamp": ts_str,
+                "payload_json": payload_json,
+            }
+            canonical_str = canonical_json(preimage_dict)
+            return hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()
+        else:
+            raise ValueError(f"Unsupported ledger event schema version: {schema_version}")
+
     @staticmethod
     def append_event(
         db: Session,
@@ -20,8 +68,7 @@ class LedgerService:
     ) -> CaseEvent:
         """
         Appends an event to the append-only ledger for the given case.
-        Computes SHA-256 hash chaining:
-        current_event_hash = SHA256(previous_event_hash + canonical_json(event_metadata_and_payload))
+        Computes cryptographic SHA-256 hash chaining over versioned canonical pre-image.
         """
         from app.core.sequences import allocate_case_event_index
 
@@ -52,21 +99,32 @@ class LedgerService:
                 public_actor_label = "System Event"
 
         payload_serialized = canonical_json(payload)
+        event_time = utc_now()
+        actor_id_val = actor.id if actor else None
 
-        # Hash structure: string with previous_hash, case_id, event_index, event_type, payload
-        hash_preimage = f"{previous_hash}|{case.id}|{next_index}|{event_type}|{payload_serialized}"
-        current_hash = hashlib.sha256(hash_preimage.encode("utf-8")).hexdigest()
+        current_hash = LedgerService.compute_event_hash(
+            schema_version=2,
+            previous_event_hash=previous_hash,
+            case_id=case.id,
+            event_index=next_index,
+            event_type=event_type,
+            actor_id=actor_id_val,
+            public_actor_label=public_actor_label,
+            created_at=event_time,
+            payload_json=payload_serialized,
+        )
 
         event = CaseEvent(
             case_id=case.id,
             event_index=next_index,
             event_type=event_type,
-            actor_id=actor.id if actor else None,
+            actor_id=actor_id_val,
             public_actor_label=public_actor_label,
             payload_json=payload_serialized,
-            schema_version=1,
+            schema_version=2,
             previous_event_hash=previous_hash,
             current_event_hash=current_hash,
+            created_at=event_time,
         )
         db.add(event)
         db.flush()
@@ -106,15 +164,24 @@ class LedgerService:
                     None,
                 )
 
-            # Recompute current hash
-            hash_preimage = f"{event.previous_event_hash}|{event.case_id}|{event.event_index}|{event.event_type}|{event.payload_json}"
-            recomputed_hash = hashlib.sha256(hash_preimage.encode("utf-8")).hexdigest()
+            # Recompute current hash via versioned canonicalization
+            recomputed_hash = LedgerService.compute_event_hash(
+                schema_version=event.schema_version,
+                previous_event_hash=event.previous_event_hash,
+                case_id=event.case_id,
+                event_index=event.event_index,
+                event_type=event.event_type,
+                actor_id=event.actor_id,
+                public_actor_label=event.public_actor_label,
+                created_at=event.created_at,
+                payload_json=event.payload_json,
+            )
 
             if recomputed_hash != event.current_event_hash:
                 return (
                     False,
                     len(events),
-                    f"Hash computation tampering detected at event index {idx} ({event.id}): payload or properties altered",
+                    f"Hash computation tampering detected at event index {idx} ({event.id}): actor, timestamp, payload, or metadata altered",
                     None,
                 )
 

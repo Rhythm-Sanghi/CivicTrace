@@ -1,7 +1,8 @@
 import json
 import zipfile
+import hashlib
 from datetime import datetime, timezone
-from app.models.entities import Case, CaseState, IssueCategory, User, UserRole
+from app.models.entities import Case, CaseEvent, CaseState, IssueCategory, User, UserRole
 from app.services.ledger import LedgerService
 from app.services.crypto_signer import SignerService
 from app.services.export_service import ExportService, VerificationMode
@@ -487,3 +488,115 @@ def test_attack_9_replaying_older_valid_export_as_current(db_session, tmp_path):
     )
     assert ok_auth_root is False
     assert any("CHECKPOINT VIOLATION: Ledger latest hash" in log for log in logs_root)
+
+
+def test_db_tamper_actor_identity_detected(db_session):
+    """
+    Direct Database Tampering Test:
+    An attacker directly updates the `actor_id` of a ledger event in the database,
+    leaving the event payload completely unchanged.
+    `verify_chain` MUST detect the tampering and fail verification.
+    """
+    case, _ = _create_test_case_with_ledger(db_session)
+    valid, total, err, _ = LedgerService.verify_chain(db_session, case.id)
+    assert valid is True
+    assert total == 4
+
+    ev2 = (
+        db_session.query(CaseEvent)
+        .filter(CaseEvent.case_id == case.id, CaseEvent.event_index == 2)
+        .first()
+    )
+    ev2.actor_id = "00000000-0000-0000-0000-000000000099"
+    db_session.commit()
+
+    valid_after, total_after, err_after, _ = LedgerService.verify_chain(db_session, case.id)
+    assert valid_after is False
+    assert "Hash computation tampering detected at event index 2" in err_after
+
+
+def test_db_tamper_timestamp_detected(db_session):
+    """
+    Direct Database Tampering Test:
+    An attacker backdates or alters the `created_at` timestamp in the database,
+    leaving the event payload completely unchanged.
+    `verify_chain` MUST detect the tampering and fail verification.
+    """
+    case, _ = _create_test_case_with_ledger(db_session)
+    ev3 = (
+        db_session.query(CaseEvent)
+        .filter(CaseEvent.case_id == case.id, CaseEvent.event_index == 3)
+        .first()
+    )
+    ev3.created_at = datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    db_session.commit()
+
+    valid, total, err, _ = LedgerService.verify_chain(db_session, case.id)
+    assert valid is False
+    assert "Hash computation tampering detected at event index 3" in err
+
+
+def test_db_tamper_public_label_detected(db_session):
+    """
+    Direct Database Tampering Test:
+    An attacker modifies `public_actor_label` in the database,
+    leaving the event payload completely unchanged.
+    `verify_chain` MUST detect the tampering and fail verification.
+    """
+    case, _ = _create_test_case_with_ledger(db_session)
+    ev1 = (
+        db_session.query(CaseEvent)
+        .filter(CaseEvent.case_id == case.id, CaseEvent.event_index == 1)
+        .first()
+    )
+    ev1.public_actor_label = "Compromised Authority"
+    db_session.commit()
+
+    valid, total, err, _ = LedgerService.verify_chain(db_session, case.id)
+    assert valid is False
+    assert "Hash computation tampering detected at event index 1" in err
+
+
+def test_historical_schema_v1_events_remain_verifiable(db_session):
+    """
+    Backward Compatibility Test:
+    Ensures historical events recorded under Schema Version 1 continue to verify
+    accurately under legacy canonicalization rules.
+    """
+    import uuid
+
+    suffix = uuid.uuid4().hex[:6]
+    cat = IssueCategory(name=f"V1 Test {suffix}", code=f"V1-{suffix}")
+    case = Case(
+        public_id=f"CAS-V1-{suffix.upper()}",
+        category=cat,
+        title="Historical Case",
+        description="Legacy test",
+        latitude=22.7,
+        longitude=75.8,
+        state=CaseState.SUBMITTED,
+    )
+    db_session.add_all([cat, case])
+    db_session.commit()
+
+    payload_str = canonical_json({"action": "created_legacy"})
+    hash1_preimage = f"{'0'*64}|{case.id}|1|CASE_CREATED|{payload_str}"
+    hash1 = hashlib.sha256(hash1_preimage.encode("utf-8")).hexdigest()
+    ev1 = CaseEvent(
+        case_id=case.id,
+        event_index=1,
+        event_type="CASE_CREATED",
+        public_actor_label="System",
+        payload_json=payload_str,
+        schema_version=1,
+        previous_event_hash="0" * 64,
+        current_event_hash=hash1,
+    )
+    db_session.add(ev1)
+    db_session.commit()
+
+    valid, count, err, latest = LedgerService.verify_chain(db_session, case.id)
+    assert valid is True
+    assert count == 1
+    assert latest == hash1
+

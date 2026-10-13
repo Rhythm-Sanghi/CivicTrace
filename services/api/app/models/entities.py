@@ -277,7 +277,7 @@ class CaseEvent(Base):
     )  # E.g., "Citizen Observer", "Public Works Operator"
 
     payload_json = Column(Text, nullable=False)  # Canonical JSON string
-    schema_version = Column(Integer, default=1, nullable=False)
+    schema_version = Column(Integer, default=2, nullable=False)
     previous_event_hash = Column(String(64), nullable=False)
     current_event_hash = Column(String(64), nullable=False)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)

@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
 """
 CivicTrace Operational Release Utility:
-Atomic Backup, Atomic Restore, Upload Interruption Recovery, and Key Rotation.
+Atomic Backup, Atomic Restore, Upload Interruption Recovery, and Key Lifecycle Management.
+
+Security Policy:
+- Application backups contain ONLY the transactional database snapshot and committed evidence assets.
+- Private signing keys (Ed25519) and JWT credentials are NEVER included in application backup archives.
+- Dedicated, encrypted key backup procedures use PBKDF2-HMAC-SHA256 and AES-256-GCM.
+- SHA-256 digests in manifests detect accidental disk corruption and truncation.
+- Ed25519 digital signatures verified against external trust anchors detect malicious archive replacement.
 
 Usage:
     python scripts/backup_restore.py backup --out backup_2026.tar.gz --db services/api/civictrace_dev.db
-    python scripts/backup_restore.py restore --archive backup_2026.tar.gz --target-dir ./restored
+    python scripts/backup_restore.py restore --archive backup_2026.tar.gz --target-dir ./restored --expected-public-key <PUB_KEY_B64>
+    python scripts/backup_restore.py backup-keys --out keys_backup.enc --passphrase <SECRET>
+    python scripts/backup_restore.py restore-keys --archive keys_backup.enc --passphrase <SECRET> --target-dir ./keys
     python scripts/backup_restore.py rotate-key --keyfile ./keys/signing_key.hex
     python scripts/backup_restore.py cleanup-interrupted --uploads services/api/storage/uploads --dry-run
 """
@@ -19,14 +28,19 @@ import json
 import sqlite3
 import argparse
 from datetime import datetime, timezone
-from pathlib import Path
+from typing import Optional, Tuple, Dict, Any
 
 # Ensure app path is resolvable
 api_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "services", "api"))
 sys.path.insert(0, api_dir)
 
 from app.core.config import settings
+from app.core.security import canonical_json
 from app.services.crypto_signer import SignerService
+
+
+class SecurityError(Exception):
+    pass
 
 
 def compute_file_sha256(filepath: str) -> str:
@@ -35,97 +49,6 @@ def compute_file_sha256(filepath: str) -> str:
         while chunk := f.read(65536):
             h.update(chunk)
     return h.hexdigest()
-
-
-def create_atomic_backup(
-    output_tar: str,
-    db_path: str = None,
-    uploads_dir: str = None,
-    keys_dir: str = None,
-) -> str:
-    """
-    Creates an atomic backup bundle pairing the database snapshot and evidence storage.
-    Uses sqlite3.backup() for consistent snapshots during application activity.
-    Includes a cryptographic manifest of all assets to prevent partial restores.
-    """
-    db_file = os.path.abspath(db_path or os.path.join(api_dir, "civictrace_dev.db"))
-    upload_path = os.path.abspath(uploads_dir or settings.UPLOAD_DIR)
-    keys_path = os.path.abspath(keys_dir or os.path.join(api_dir, "storage", "keys"))
-
-    if not os.path.exists(db_file):
-        raise FileNotFoundError(f"Database file not found: {db_file}")
-
-    print(f"[*] Initiating atomic SQLite snapshot of database: {db_file}")
-    temp_snapshot_db = output_tar + ".snapshot.db"
-
-    # Use SQLite online backup API for safe transactional snapshot
-    src_conn = sqlite3.connect(db_file)
-    dst_conn = sqlite3.connect(temp_snapshot_db)
-    src_conn.backup(dst_conn)
-    dst_conn.close()
-    src_conn.close()
-
-    try:
-        manifest = {
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "database_sha256": compute_file_sha256(temp_snapshot_db),
-            "files": {},
-            "keys": {},
-        }
-
-        if os.path.exists(upload_path):
-            for root, _, files in os.walk(upload_path):
-                for file in files:
-                    if file == ".gitkeep":
-                        continue
-                    fpath = os.path.join(root, file)
-                    relpath = os.path.relpath(fpath, upload_path).replace("\\", "/")
-                    manifest["files"][relpath] = {
-                        "sha256": compute_file_sha256(fpath),
-                        "size_bytes": os.path.getsize(fpath),
-                    }
-
-        if os.path.exists(keys_path):
-            for root, _, files in os.walk(keys_path):
-                for file in files:
-                    fpath = os.path.join(root, file)
-                    relpath = os.path.relpath(fpath, keys_path).replace("\\", "/")
-                    manifest["keys"][relpath] = {
-                        "sha256": compute_file_sha256(fpath),
-                        "size_bytes": os.path.getsize(fpath),
-                    }
-
-        temp_manifest = output_tar + ".manifest.json"
-        with open(temp_manifest, "w", encoding="utf-8") as f:
-            json.dump(manifest, f, indent=2)
-
-        print(f"[*] Packaging into tar archive: {output_tar}")
-        with tarfile.open(output_tar, "w:gz") as tar:
-            tar.add(temp_snapshot_db, arcname="database.db")
-            tar.add(temp_manifest, arcname="manifest.json")
-            if os.path.exists(upload_path):
-                for root, _, files in os.walk(upload_path):
-                    for file in files:
-                        if file == ".gitkeep":
-                            continue
-                        fpath = os.path.join(root, file)
-                        relpath = os.path.relpath(fpath, upload_path).replace("\\", "/")
-                        tar.add(fpath, arcname=f"uploads/{relpath}")
-            if os.path.exists(keys_path):
-                for root, _, files in os.walk(keys_path):
-                    for file in files:
-                        fpath = os.path.join(root, file)
-                        relpath = os.path.relpath(fpath, keys_path).replace("\\", "/")
-                        tar.add(fpath, arcname=f"keys/{relpath}")
-
-        if os.path.exists(temp_manifest):
-            os.remove(temp_manifest)
-    finally:
-        if os.path.exists(temp_snapshot_db):
-            os.remove(temp_snapshot_db)
-
-    print(f"[OK] Atomic backup archive created: {output_tar} ({os.path.getsize(output_tar)} bytes)")
-    return output_tar
 
 
 def _safe_extract(tar: tarfile.TarFile, path: str):
@@ -140,14 +63,171 @@ def _safe_extract(tar: tarfile.TarFile, path: str):
     tar.extractall(path=dest_path)
 
 
-class SecurityError(Exception):
-    pass
-
-
-def restore_atomic_backup(backup_tar: str, restore_dir: str) -> bool:
+def create_atomic_backup(
+    output_tar: str,
+    db_path: Optional[str] = None,
+    uploads_dir: Optional[str] = None,
+    keys_dir: Optional[str] = None,  # Explicitly rejected or ignored for security
+) -> str:
     """
-    Restores database and evidence assets while strictly verifying manifest integrity.
-    Prevents path traversal and archive tampering.
+    Creates an atomic backup bundle pairing the transactional database snapshot
+    and committed evidence storage.
+    Uses sqlite3.backup() for consistent snapshots during application activity.
+    Cross-references database evidence_assets table so in-flight/uncommitted files
+    or temporary upload fragments (.tmp, .part) are never packaged.
+    Signs the manifest with Ed25519 to protect against malicious archive replacement.
+    STRICTLY EXCLUDES private signing keys and credentials.
+    """
+    if keys_dir:
+        print("[!] SECURITY WARNING: Private key directory argument was provided to application backup. "
+              "Private keys are strictly excluded from application backups to prevent credential leakage. "
+              "Use 'backup-keys' for controlled, encrypted key backups.")
+
+    db_file = os.path.abspath(db_path or os.path.join(api_dir, "civictrace_dev.db"))
+    upload_path = os.path.abspath(uploads_dir or settings.UPLOAD_DIR)
+
+    if not os.path.exists(db_file):
+        raise FileNotFoundError(f"Database file not found: {db_file}")
+
+    print(f"[*] Initiating atomic SQLite snapshot of database: {db_file}")
+    temp_snapshot_db = output_tar + ".snapshot.db"
+
+    # 1. Atomic database snapshot via SQLite Online Backup API
+    src_conn = sqlite3.connect(db_file)
+    dst_conn = sqlite3.connect(temp_snapshot_db)
+    src_conn.backup(dst_conn)
+    dst_conn.close()
+    src_conn.close()
+
+    try:
+        # 2. Inspect snapshot database for committed evidence assets to prevent race conditions
+        committed_assets: Dict[str, Dict[str, Any]] = {}
+        snap_conn = None
+        try:
+            snap_conn = sqlite3.connect(temp_snapshot_db)
+            snap_cur = snap_conn.cursor()
+            snap_cur.execute("SELECT id, file_name, file_path, file_hash FROM evidence_assets")
+            for row in snap_cur.fetchall():
+                asset_id, file_name, file_rel_path, expected_hash = row
+                # Normalize key to basename or relative path
+                if file_rel_path:
+                    norm_path = file_rel_path.replace("\\", "/").lstrip("/")
+                    committed_assets[norm_path] = {
+                        "asset_id": asset_id,
+                        "file_name": file_name,
+                        "expected_hash": expected_hash,
+                    }
+                elif file_name:
+                    committed_assets[file_name] = {
+                        "asset_id": asset_id,
+                        "file_name": file_name,
+                        "expected_hash": expected_hash,
+                    }
+        except Exception as e:
+            print(f"[!] Note: Could not query evidence_assets from snapshot ({e}); falling back to verified file scan.")
+        finally:
+            if snap_conn:
+                snap_conn.close()
+
+        # 3. Collect evidence assets matching committed state
+        files_manifest: Dict[str, Dict[str, Any]] = {}
+        files_to_pack: list[Tuple[str, str]] = []
+
+        if os.path.exists(upload_path):
+            for root, _, files in os.walk(upload_path):
+                for file in files:
+                    # Ignore temporary/in-progress upload fragments
+                    if file == ".gitkeep" or file.endswith(".tmp") or file.endswith(".part"):
+                        continue
+                    fpath = os.path.join(root, file)
+                    relpath = os.path.relpath(fpath, upload_path).replace("\\", "/")
+
+                    # If committed assets are known, only include committed files
+                    if committed_assets and relpath not in committed_assets and file not in committed_assets:
+                        # Uncommitted or in-flight upload: skip to ensure consistent point-in-time recovery
+                        continue
+
+                    try:
+                        file_hash = compute_file_sha256(fpath)
+                        file_size = os.path.getsize(fpath)
+                        files_manifest[relpath] = {
+                            "sha256": file_hash,
+                            "size_bytes": file_size,
+                        }
+                        files_to_pack.append((fpath, f"uploads/{relpath}"))
+                    except (FileNotFoundError, PermissionError):
+                        # Concurrent deletion during backup: skip cleanly
+                        continue
+
+        # 4. Construct cryptographic manifest
+        db_hash = compute_file_sha256(temp_snapshot_db)
+        manifest_body: Dict[str, Any] = {
+            "format": "civictrace_backup_manifest",
+            "version": "2.0",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "database_sha256": db_hash,
+            "files": files_manifest,
+            "security_policy": {
+                "private_keys_included": False,
+                "integrity_scope": "SHA-256 digests detect accidental corruption and transfer truncation.",
+                "authenticity_scope": "Ed25519 digital signature binds manifest to authorized system authority.",
+            },
+        }
+
+        # Sign manifest with system trust anchor if available
+        try:
+            canonical_manifest = canonical_json(manifest_body).encode("utf-8")
+            sig_b64 = SignerService.sign_bytes(canonical_manifest)
+            pub_key_b64 = SignerService.get_public_key_base64()
+            manifest_body["signature"] = sig_b64
+            manifest_body["signer_public_key"] = pub_key_b64
+        except Exception:
+            manifest_body["signature"] = None
+            manifest_body["signer_public_key"] = None
+
+        temp_manifest = output_tar + ".manifest.json"
+        with open(temp_manifest, "w", encoding="utf-8") as f:
+            json.dump(manifest_body, f, indent=2)
+
+        # 5. Pack into tar.gz archive
+        print(f"[*] Packaging into archive: {output_tar}")
+        with tarfile.open(output_tar, "w:gz") as tar:
+            tar.add(temp_snapshot_db, arcname="database.db")
+            tar.add(temp_manifest, arcname="manifest.json")
+            for src_path, arc_name in files_to_pack:
+                if os.path.exists(src_path):
+                    tar.add(src_path, arcname=arc_name)
+
+        if os.path.exists(temp_manifest):
+            try:
+                os.remove(temp_manifest)
+            except Exception:
+                pass
+    finally:
+        import gc
+        gc.collect()
+        if os.path.exists(temp_snapshot_db):
+            try:
+                os.remove(temp_snapshot_db)
+            except Exception:
+                pass
+
+    print(f"[OK] Atomic backup archive created: {output_tar} ({os.path.getsize(output_tar)} bytes)")
+    return output_tar
+
+
+def restore_atomic_backup(
+    backup_tar: str,
+    restore_dir: str,
+    expected_public_key: Optional[str] = None,
+) -> bool:
+    """
+    Restores database and evidence assets while strictly verifying:
+    1. Archive path safety (path traversal prevention).
+    2. Digital signature authenticity against expected_public_key (if supplied).
+    3. Transactional database SHA-256 digest integrity against manifest.
+    4. Every individual evidence asset SHA-256 digest against manifest.
+    5. Rejection of any unauthorized private keys found in the archive.
     """
     if not os.path.exists(backup_tar):
         raise FileNotFoundError(f"Backup archive not found: {backup_tar}")
@@ -159,44 +239,81 @@ def restore_atomic_backup(backup_tar: str, restore_dir: str) -> bool:
 
     try:
         with tarfile.open(backup_tar, "r:gz") as tar:
+            # Security: Path traversal validation
             _safe_extract(tar, temp_extract)
 
         manifest_path = os.path.join(temp_extract, "manifest.json")
         if not os.path.exists(manifest_path):
-            raise ValueError("Corrupt backup: manifest.json missing!")
+            raise ValueError("Corrupt backup: manifest.json missing from root!")
 
         with open(manifest_path, "r", encoding="utf-8") as f:
             manifest = json.load(f)
 
+        # Authenticity check: Verify digital signature if trust anchor is provided
+        if expected_public_key:
+            sig = manifest.get("signature")
+            signer_key = manifest.get("signer_public_key")
+            if not sig or not signer_key:
+                raise ValueError("TRUST ANCHOR ERROR: Backup manifest lacks digital signature for trusted verification.")
+            if signer_key != expected_public_key:
+                raise ValueError(
+                    f"TRUST ANCHOR VIOLATION: Manifest signer key does not match expected trusted public key. "
+                    f"Possible malicious archive replacement detected."
+                )
+
+            # Reconstruct content signed
+            manifest_to_verify = dict(manifest)
+            manifest_to_verify.pop("signature", None)
+            manifest_to_verify.pop("signer_public_key", None)
+            canonical_bytes = canonical_json(manifest_to_verify).encode("utf-8")
+            if not SignerService.verify_signature(canonical_bytes, sig, expected_public_key):
+                raise ValueError("AUTHENTICITY VIOLATION: Manifest digital signature invalid against trusted public key.")
+            print("[OK] Manifest Ed25519 digital signature verified against external trust anchor.")
+
+        # Database checksum integrity verification
         db_restored = os.path.join(temp_extract, "database.db")
+        if not os.path.exists(db_restored):
+            raise ValueError("Corrupt backup: database.db missing from archive.")
         actual_db_hash = compute_file_sha256(db_restored)
         if actual_db_hash != manifest["database_sha256"]:
-            raise ValueError("Database checksum mismatch! Potential archive tampering.")
+            raise ValueError(
+                f"CORRUPTION DETECTED: Database checksum mismatch! "
+                f"Expected {manifest['database_sha256']}, got {actual_db_hash}."
+            )
 
+        # Evidence file integrity verification
         uploads_restored = os.path.join(temp_extract, "uploads")
-        if os.path.exists(uploads_restored):
-            for relpath, meta in manifest.get("files", {}).items():
+        manifest_files = manifest.get("files", {})
+        if manifest_files:
+            if not os.path.exists(uploads_restored):
+                raise ValueError("Corrupt backup: uploads declared in manifest but directory missing.")
+            for relpath, meta in manifest_files.items():
                 fpath = os.path.join(uploads_restored, relpath)
                 if not os.path.exists(fpath):
-                    raise ValueError(f"Evidence file missing from restore: {relpath}")
-                if compute_file_sha256(fpath) != meta["sha256"]:
-                    raise ValueError(f"Evidence file digest mismatch: {relpath}")
+                    raise ValueError(f"CORRUPTION DETECTED: Declared evidence file missing: {relpath}")
+                actual_hash = compute_file_sha256(fpath)
+                if actual_hash != meta["sha256"]:
+                    raise ValueError(
+                        f"CORRUPTION DETECTED: Evidence file {relpath} digest mismatch! "
+                        f"Expected {meta['sha256']}, got {actual_hash}."
+                    )
 
-        # Deploy restored files to target directory
+        # Security check: Ensure no rogue private keys are unpacked into application directory
+        keys_restored = os.path.join(temp_extract, "keys")
+        if os.path.exists(keys_restored):
+            print("[!] SECURITY WARNING: Archive contained a 'keys/' directory. "
+                  "Per security policy, private keys are strictly rejected and will NOT be deployed.")
+
+        # Deploy restored verified files to target directory
         final_db = os.path.join(restore_dir, "civictrace_dev.db")
         final_uploads = os.path.join(restore_dir, "uploads")
+        os.makedirs(restore_dir, exist_ok=True)
         shutil.copy2(db_restored, final_db)
+
         if os.path.exists(uploads_restored):
             if os.path.exists(final_uploads):
                 shutil.rmtree(final_uploads)
             shutil.copytree(uploads_restored, final_uploads)
-
-        keys_restored = os.path.join(temp_extract, "keys")
-        if os.path.exists(keys_restored):
-            final_keys = os.path.join(restore_dir, "keys")
-            if os.path.exists(final_keys):
-                shutil.rmtree(final_keys)
-            shutil.copytree(keys_restored, final_keys)
 
         print(f"[OK] Backup restored and verified successfully into: {restore_dir}")
         return True
@@ -205,9 +322,115 @@ def restore_atomic_backup(backup_tar: str, restore_dir: str) -> bool:
             shutil.rmtree(temp_extract)
 
 
+def create_encrypted_key_backup(
+    output_file: str,
+    passphrase: str,
+    keys_dir: Optional[str] = None,
+) -> str:
+    """
+    Dedicated, controlled procedure for backing up Ed25519 signing keys.
+    Encrypts the key store using PBKDF2-HMAC-SHA256 (100,000 iterations) and AES-256-GCM.
+    Keeps signing credentials strictly isolated from standard application backups.
+    """
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from cryptography.hazmat.primitives import hashes
+
+    source_dir = os.path.abspath(keys_dir or os.path.join(api_dir, "storage", "keys"))
+    if not os.path.exists(source_dir):
+        raise FileNotFoundError(f"Keys directory not found: {source_dir}")
+
+    if len(passphrase) < 12:
+        raise ValueError("Passphrase for key backup must be at least 12 characters.")
+
+    # 1. Package key files into memory tar
+    import io
+    tar_bytes_io = io.BytesIO()
+    with tarfile.open(fileobj=tar_bytes_io, mode="w:gz") as tar:
+        for root, _, files in os.walk(source_dir):
+            for f in files:
+                fpath = os.path.join(root, f)
+                relpath = os.path.relpath(fpath, source_dir)
+                tar.add(fpath, arcname=relpath)
+
+    tar_bytes = tar_bytes_io.getvalue()
+
+    # 2. Derive key via PBKDF2
+    salt = os.urandom(16)
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+    )
+    derived_key = kdf.derive(passphrase.encode("utf-8"))
+
+    # 3. Encrypt via AES-GCM
+    aesgcm = AESGCM(derived_key)
+    nonce = os.urandom(12)
+    ciphertext = aesgcm.encrypt(nonce, tar_bytes, None)
+
+    # 4. Write bundle: [SALT (16)] + [NONCE (12)] + [CIPHERTEXT]
+    with open(output_file, "wb") as f:
+        f.write(salt + nonce + ciphertext)
+
+    print(f"[OK] Encrypted key backup created: {output_file} ({os.path.getsize(output_file)} bytes)")
+    return output_file
+
+
+def restore_encrypted_key_backup(
+    input_file: str,
+    passphrase: str,
+    target_dir: Optional[str] = None,
+) -> bool:
+    """
+    Restores Ed25519 signing keys from an encrypted key backup using passphrase.
+    """
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from cryptography.hazmat.primitives import hashes
+
+    if not os.path.exists(input_file):
+        raise FileNotFoundError(f"Encrypted key backup not found: {input_file}")
+
+    dest_dir = os.path.abspath(target_dir or os.path.join(api_dir, "storage", "keys"))
+    os.makedirs(dest_dir, exist_ok=True)
+
+    with open(input_file, "rb") as f:
+        data = f.read()
+
+    if len(data) < 28:
+        raise ValueError("Invalid encrypted key backup: file too short.")
+
+    salt = data[:16]
+    nonce = data[16:28]
+    ciphertext = data[28:]
+
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+    )
+    derived_key = kdf.derive(passphrase.encode("utf-8"))
+
+    aesgcm = AESGCM(derived_key)
+    try:
+        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+    except Exception:
+        raise ValueError("Decryption failed! Incorrect passphrase or corrupted key archive.")
+
+    import io
+    with tarfile.open(fileobj=io.BytesIO(plaintext), mode="r:gz") as tar:
+        _safe_extract(tar, dest_dir)
+
+    print(f"[OK] Signing keys restored securely into: {dest_dir}")
+    return True
+
+
 def cleanup_interrupted_uploads(
-    uploads_dir: str = None,
-    db_path: str = None,
+    uploads_dir: Optional[str] = None,
+    db_path: Optional[str] = None,
     dry_run: bool = False,
 ) -> int:
     """
@@ -219,7 +442,6 @@ def cleanup_interrupted_uploads(
     if not os.path.exists(target_dir):
         return 0
 
-    # Collect known active files from database if accessible
     active_files = set()
     db_file = os.path.abspath(db_path or os.path.join(api_dir, "civictrace_dev.db"))
     if os.path.exists(db_file):
@@ -255,7 +477,7 @@ def cleanup_interrupted_uploads(
     return removed
 
 
-def rotate_signing_key(key_file: str) -> tuple[str, str]:
+def rotate_signing_key(key_file: str) -> Tuple[str, str]:
     """
     Generates a fresh Ed25519 signing keypair, writes private key to secure key file,
     and updates trusted_anchors_history.json so older evidence packages remain verifiable.
@@ -323,32 +545,48 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
 
     # backup
-    p_backup = subparsers.add_parser("backup")
+    p_backup = subparsers.add_parser("backup", help="Create atomic database & evidence backup")
     p_backup.add_argument("--out", "--out-dir", dest="out", default="civictrace_backup.tar.gz")
     p_backup.add_argument("--db", "--db-path", dest="db", default=None)
     p_backup.add_argument("--uploads", "--uploads-dir", dest="uploads", default=None)
-    p_backup.add_argument("--keys", "--keys-dir", dest="keys", default=None)
 
     # restore
-    p_restore = subparsers.add_parser("restore")
+    p_restore = subparsers.add_parser("restore", help="Restore and verify atomic database & evidence backup")
     p_restore.add_argument("--archive", "--in", dest="input_tar", required=True)
     p_restore.add_argument("--target-dir", "--db-target", dest="target_dir", required=True)
+    p_restore.add_argument("--expected-public-key", dest="expected_public_key", default=None)
+
+    # backup-keys
+    p_bkeys = subparsers.add_parser("backup-keys", help="Create encrypted backup of signing keys")
+    p_bkeys.add_argument("--out", dest="out", required=True)
+    p_bkeys.add_argument("--passphrase", dest="passphrase", required=True)
+    p_bkeys.add_argument("--keys-dir", dest="keys_dir", default=None)
+
+    # restore-keys
+    p_rkeys = subparsers.add_parser("restore-keys", help="Restore encrypted signing keys with passphrase")
+    p_rkeys.add_argument("--archive", dest="input_file", required=True)
+    p_rkeys.add_argument("--passphrase", dest="passphrase", required=True)
+    p_rkeys.add_argument("--target-dir", dest="target_dir", default=None)
 
     # rotate-key
-    p_rotate = subparsers.add_parser("rotate-key")
-    p_rotate.add_argument("--keyfile", "--keys-dir", dest="keyfile", default="./keys/signing_key.hex")
+    p_rotate = subparsers.add_parser("rotate-key", help="Rotate Ed25519 system signing key")
+    p_rotate.add_argument("--keyfile", dest="keyfile", default="./keys/signing_key.hex")
 
     # cleanup
-    p_clean = subparsers.add_parser("cleanup-interrupted")
+    p_clean = subparsers.add_parser("cleanup-interrupted", help="Clean up dangling upload fragments")
     p_clean.add_argument("--uploads", "--uploads-dir", dest="uploads", default=None)
     p_clean.add_argument("--db", "--db-path", dest="db", default=None)
     p_clean.add_argument("--dry-run", action="store_true", default=False)
 
     args = parser.parse_args()
     if args.command == "backup":
-        create_atomic_backup(args.out, args.db, args.uploads, getattr(args, "keys", None))
+        create_atomic_backup(args.out, args.db, args.uploads)
     elif args.command == "restore":
-        restore_atomic_backup(args.input_tar, args.target_dir)
+        restore_atomic_backup(args.input_tar, args.target_dir, getattr(args, "expected_public_key", None))
+    elif args.command == "backup-keys":
+        create_encrypted_key_backup(args.out, args.passphrase, args.keys_dir)
+    elif args.command == "restore-keys":
+        restore_encrypted_key_backup(args.input_file, args.passphrase, args.target_dir)
     elif args.command == "rotate-key":
         rotate_signing_key(args.keyfile)
     elif args.command == "cleanup-interrupted":

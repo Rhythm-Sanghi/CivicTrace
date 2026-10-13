@@ -23,33 +23,42 @@ export const CaseDetailsView: React.FC = () => {
   const [verificationSubmitting, setVerificationSubmitting] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string>("");
 
-  const loadData = async () => {
-    if (!id) return;
-    try {
-      const c = await api.getCase(id);
-      setCaseItem(c);
-      try {
-        const evts = await api.getCaseEvents(id);
-        setEvents(evts);
-      } catch (e) {
-        console.error("Events error", e);
-      }
-      try {
-        const val = await api.verifyLedger(id);
-        setLedgerValidation(val);
-      } catch (e) {
-        console.error("Ledger validation error", e);
-      }
-    } catch (err: any) {
-      console.error("Failed to load case", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const loadData = () => setRefreshTrigger((prev) => prev + 1);
 
   useEffect(() => {
-    loadData();
-  }, [id]);
+    if (!id) return;
+    let isCancelled = false;
+
+    const fetchData = async () => {
+      try {
+        const c = await api.getCase(id);
+        if (isCancelled) return;
+        setCaseItem(c);
+        try {
+          const evts = await api.getCaseEvents(id);
+          if (!isCancelled) setEvents(evts);
+        } catch (e) {
+          console.error("Events error", e);
+        }
+        try {
+          const val = await api.verifyLedger(id);
+          if (!isCancelled) setLedgerValidation(val);
+        } catch (e) {
+          console.error("Ledger validation error", e);
+        }
+      } catch (err: any) {
+        console.error("Failed to load case", err);
+      } finally {
+        if (!isCancelled) setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => {
+      isCancelled = true;
+    };
+  }, [id, refreshTrigger]);
 
   const handleVerificationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

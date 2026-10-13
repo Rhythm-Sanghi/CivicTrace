@@ -1,10 +1,10 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.entities import User, UserRole
-from app.schemas.all_schemas import UserCreate, UserPublic, Token
+from app.schemas.all_schemas import UserCreate, UserPublic, Token, IdentityEnrollmentRequest
 from app.core.security import (
     verify_password,
     verify_dummy_password,
@@ -167,12 +167,13 @@ def read_current_user(current_user: User = Depends(get_current_user)):
 @router.post("/users/{user_id}/verify-identity", response_model=UserPublic)
 def verify_user_identity(
     user_id: str,
-    provider: str = Query("MUNICIPAL_VERIFIED_ENROLLMENT", min_length=3, max_length=50),
+    enrollment: IdentityEnrollmentRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     Authorized Administrator endpoint to enroll a citizen with verified identity assurance.
+    Requires an approved verification method and an auditable enrollment reason.
     Ordinary self-registration CANNOT set verified identity status.
     """
     if current_user.role != UserRole.ADMINISTRATOR:
@@ -188,8 +189,15 @@ def verify_user_identity(
             detail="Target user not found.",
         )
 
+    reason = enrollment.enrollment_reason.strip()
+    if len(reason) < 10:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Enrollment reason must be at least 10 non-whitespace characters explaining the verification basis.",
+        )
+
     target_user.is_identity_verified = True
-    target_user.identity_provider = provider
+    target_user.identity_provider = enrollment.verification_method.value
     db.commit()
     db.refresh(target_user)
     return target_user

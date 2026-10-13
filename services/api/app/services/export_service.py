@@ -82,17 +82,21 @@ class ExportService:
             "export_schema_version": "1.1",
         }
 
+        from app.services.ledger import LedgerService
+
         events_doc = [
             {
                 "case_id": e.case_id,
                 "event_index": e.event_index,
                 "event_type": e.event_type,
+                "actor_id": e.actor_id,
                 "public_actor_label": e.public_actor_label,
                 "payload": json.loads(e.payload_json),
                 "payload_json": e.payload_json,
+                "schema_version": e.schema_version,
                 "previous_event_hash": e.previous_event_hash,
                 "current_event_hash": e.current_event_hash,
-                "timestamp": e.created_at.isoformat(),
+                "timestamp": LedgerService.canonical_iso_timestamp(e.created_at),
             }
             for e in events
         ]
@@ -363,15 +367,26 @@ class ExportService:
                                 f"TAMPER DETECTED: Event ledger hash chain broken at event {idx}."
                             ]
 
-                        # Verify hash preimage integrity
+                        # Verify hash preimage integrity via versioned canonicalization
+                        from app.services.ledger import LedgerService
+
                         case_id_val = ev.get("case_id") or case_ref
                         payload_val = (
                             ev.get("payload_json")
                             if "payload_json" in ev
                             else canonical_json(ev["payload"])
                         )
-                        preimage = f"{ev['previous_event_hash']}|{case_id_val}|{ev['event_index']}|{ev['event_type']}|{payload_val}"
-                        calculated_hash = hashlib.sha256(preimage.encode("utf-8")).hexdigest()
+                        calculated_hash = LedgerService.compute_event_hash(
+                            schema_version=ev.get("schema_version", 1),
+                            previous_event_hash=ev["previous_event_hash"],
+                            case_id=case_id_val,
+                            event_index=ev["event_index"],
+                            event_type=ev["event_type"],
+                            actor_id=ev.get("actor_id"),
+                            public_actor_label=ev.get("public_actor_label", ""),
+                            created_at=ev.get("timestamp"),
+                            payload_json=payload_val,
+                        )
                         if ev.get("current_event_hash") != calculated_hash:
                             return False, [
                                 f"TAMPER DETECTED: Event {idx} current hash mismatch. Event actor, timestamp, or payload was tampered."

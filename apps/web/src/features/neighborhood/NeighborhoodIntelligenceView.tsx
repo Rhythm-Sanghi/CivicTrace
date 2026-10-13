@@ -20,6 +20,7 @@ export const NeighborhoodIntelligenceView: React.FC = () => {
   }, []);
 
   // Compute live distributions from real cases
+  const [referenceTime] = useState(() => Date.now());
   const {
     stateDistribution,
     ageDistribution,
@@ -30,7 +31,6 @@ export const NeighborhoodIntelligenceView: React.FC = () => {
     const statesCount: Record<string, number> = {};
     const ageBuckets = { "< 24h": 0, "1–3 days": 0, "4–7 days": 0, "> 7 days": 0 };
     const catMap: Record<string, number> = {};
-    const now = Date.now();
 
     cases.forEach((c) => {
       // 1. Lifecycle State count
@@ -38,7 +38,7 @@ export const NeighborhoodIntelligenceView: React.FC = () => {
 
       // 2. Age distribution
       const createdTime = new Date(c.created_at).getTime();
-      const ageHours = Math.max(0, (now - createdTime) / (1000 * 3600));
+      const ageHours = Math.max(0, (referenceTime - createdTime) / (1000 * 3600));
       if (ageHours < 24) ageBuckets["< 24h"]++;
       else if (ageHours <= 72) ageBuckets["1–3 days"]++;
       else if (ageHours <= 168) ageBuckets["4–7 days"]++;
@@ -83,7 +83,7 @@ export const NeighborhoodIntelligenceView: React.FC = () => {
         totalClaims: resolvedCount + disputedCount + awaitingCount,
       },
     };
-  }, [cases]);
+  }, [cases, referenceTime]);
 
   if (loading) {
     return (

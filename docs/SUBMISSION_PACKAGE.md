@@ -27,7 +27,7 @@ CivicTrace is not another generic ticket management portal. It is an **evidence-
 4. **Append-Only Cryptographic Event Ledger:** Every lifecycle event (creation, duplicate link, assignment, operator claim, dispute, verification) is recorded as a sequential event with an immutable SHA-256 hash chained to the preceding event. Any back-door alteration to the database breaks the mathematical chain and is flagged immediately.
 5. **Resolution Verification Gate & Dispute Safeguard:** An operator claiming a repair (`RESOLUTION_CLAIMED`) does not close the case; it moves to `AWAITING_VERIFICATION`. Only qualifying independent citizen observations (`CONFIRMED_FIXED`) or reviewer consensus can close a case (`RESOLVED`). Crucially, if an observer files a dispute (`STILL_UNRESOLVED`), the case instantly transitions to `DISPUTED`, triggering review and ordering department rework.
 6. **Portable Evidence Export & Tamper Verification:** Anyone can download a standalone `.zip` evidence package containing canonical JSON event timelines, observation logs, and a `manifest.json` with individual SHA-256 digests. If any byte in the exported case history is tampered with, the included offline CLI verification tool mathematically identifies the altered file.
-7. **Benchlight-Class Visual Identity:** Rebuilt with strict visual parity to the Benchlight desktop productivity software—featuring numbered navigation (`01 Overview`, `02 Cases`, `03 Intelligence`), warm brass `#795f2f` accents, flat measurement bars, sortable tables with 2-line title clamping, and an interactive schematic map canvas.
+7. **CivicTrace Workshop Visual Identity:** Rebuilt with an ergonomic desktop productivity design language—featuring numbered navigation (`01 Overview`, `02 Cases`, `03 Intelligence`), warm brass `#795f2f` accents, flat measurement bars, sortable tables with 2-line title clamping, and an interactive schematic map canvas.
 
 ---
 
@@ -35,7 +35,7 @@ CivicTrace is not another generic ticket management portal. It is an **evidence-
 - **Backend & Core Engine:** Python 3.11, FastAPI, SQLAlchemy 2.0, Alembic, SQLite (modular monolith architecture, PostgreSQL/PostGIS portable).
 - **Security & Integrity:** Cryptographic SHA-256 hash chaining, canonical JSON serialization, JWT authentication, Passlib/Bcrypt, role-based access control (Citizen, Reviewer, Operator, Administrator).
 - **Algorithms:** Deterministic spatial Haversine distance, tokenized Jaccard similarity, explainable multi-component priority scoring.
-- **Frontend & Design System:** React 19, TypeScript, Vite, custom Benchlight design tokens (canvas `#f4f4f1`, surface `#fafaf8`, accent `#795f2f`, Cascadia Mono typography).
+- **Frontend & Design System:** React 19, TypeScript, Vite, custom CivicTrace Workshop design tokens (canvas `#f4f4f1`, surface `#fafaf8`, accent `#795f2f`, Cascadia Mono typography).
 - **Validation & Quality Assurance:** Pytest (10/10 passing tests), Vitest (2/2 passing tests), Playwright real-browser interactive E2E automation (all 14 lifecycle stages verified).
 
 ---
@@ -43,7 +43,7 @@ CivicTrace is not another generic ticket management portal. It is an **evidence-
 ### Challenges We Encountered
 1. **Preventing Conflicts of Interest in Resolution:** Building a verification system that cannot be gamed required strict backend safeguards: department operators are strictly blocked (`403 Forbidden`) from self-verifying their own resolution claims. Uncontested closures require a quorum of two independent citizen observations.
 2. **Deterministic Correlation Without Heavy Cloud AI:** We wanted CivicTrace to run completely offline on a low-spec laptop without requiring expensive cloud AI API keys. We designed a pure-CPU mathematical engine combining spatial radius clamping with tokenized Jaccard text scoring that consistently matches nearby reports in sub-millisecond time.
-3. **Benchlight Visual Parity:** Translating dense municipal data into Benchlight's calm, utilitarian desktop aesthetic required careful typographic hierarchy, flat `<dl>` measurement strips with vertical dividers, stable table column allocations, and decluttered map markers.
+3. **Workshop Design Ergonomics:** Translating dense municipal data into a calm, utilitarian desktop aesthetic required careful typographic hierarchy, flat `<dl>` measurement strips with vertical dividers, stable table column allocations, and decluttered map markers.
 
 ---
 
@@ -70,7 +70,7 @@ CivicTrace is not another generic ticket management portal. It is an **evidence-
 ## 3. Curated Screenshots & Captions (Devpost Selection)
 
 1. **`01_overview.png` — Overview & Indore Ward 34 Schematic Investigation Canvas**  
-   *Caption: Compact Benchlight-style overview featuring real-time civic telemetry, flat measurement strips, and an offline schematic grid canvas plotting active municipal infrastructure defects with interactive pan/zoom controls.*
+   *Caption: Compact CivicTrace Workshop overview featuring real-time civic telemetry, flat measurement strips, and an offline schematic grid canvas plotting active municipal infrastructure defects with interactive pan/zoom controls.*
 
 2. **`02_cases_explorer.png` — Public Infrastructure Cases Explorer**  
    *Caption: High-density flat data table with stable column widths, 2-line title clamping, interactive column sorting, and responsive multi-field filtering across categories and priority bands.*
@@ -102,7 +102,7 @@ CivicTrace is not another generic ticket management portal. It is an **evidence-
 
 ### [0:00 – 0:30] Introduction & The Problem
 > *"Hello, this is CivicTrace. In almost every municipal portal today, citizen complaints go into a black box. A worker marks a ticket as resolved, the complaint disappears, and the pothole or broken pipe is still there.*
-> *CivicTrace is built on one simple rule: a complaint should never disappear just because someone changes its status. It is an evidence-oriented public issue investigation system built with Benchlight's calm, utilitarian design language."*
+> *CivicTrace is built on one simple rule: a complaint should never disappear just because someone changes its status. It is an evidence-oriented public issue investigation system built with a calm, utilitarian workshop design language."*
 
 ### [0:30 – 1:00] Overview & Public Explorer
 > *(Screen shows `http://localhost:5173/` and navigation to `02 / Cases`)*

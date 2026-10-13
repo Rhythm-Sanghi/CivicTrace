@@ -575,27 +575,67 @@ def test_identity_enrollment_endpoint_authorization(client, db_session):
 
     rev_token = create_access_token(subject=reviewer.id)
     admin_token = create_access_token(subject=admin.id)
+    citizen_token = create_access_token(subject=citizen.id)
 
-    # Reviewer attempts to enroll citizen -> 403 Forbidden
+    valid_payload = {
+        "verification_method": "MUNICIPAL_DESK_IN_PERSON",
+        "enrollment_reason": "In-person residency verification at City Ward Office 4",
+        "auditor_notes": "Deed and utility bill inspected by officer.",
+    }
+
+    # 1. Citizen attempts to enroll themselves -> 403 Forbidden
+    res_citizen = client.post(
+        f"/api/v1/auth/users/{citizen.id}/verify-identity",
+        json=valid_payload,
+        headers={"Authorization": f"Bearer {citizen_token}"},
+    )
+    assert res_citizen.status_code == 403
+
+    # 2. Reviewer attempts to enroll citizen -> 403 Forbidden
     res_rev = client.post(
-        f"/api/v1/auth/users/{citizen.id}/verify-identity?provider=AADHAAR_MUNICIPAL",
+        f"/api/v1/auth/users/{citizen.id}/verify-identity",
+        json=valid_payload,
         headers={"Authorization": f"Bearer {rev_token}"},
     )
     assert res_rev.status_code == 403
 
-    # Admin enrolls citizen -> 200 OK
+    # 3. Admin attempts enrollment without body -> 422 Unprocessable Entity
+    res_no_body = client.post(
+        f"/api/v1/auth/users/{citizen.id}/verify-identity",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert res_no_body.status_code == 422
+
+    # 4. Admin attempts enrollment with short reason (< 10 chars) -> 422
+    res_short = client.post(
+        f"/api/v1/auth/users/{citizen.id}/verify-identity",
+        json={"verification_method": "MUNICIPAL_DESK_IN_PERSON", "enrollment_reason": "short"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert res_short.status_code == 422
+
+    # 5. Admin attempts enrollment with unapproved method -> 422
+    res_bad_method = client.post(
+        f"/api/v1/auth/users/{citizen.id}/verify-identity",
+        json={"verification_method": "ARBITRARY_METHOD", "enrollment_reason": "Long enough reason here"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert res_bad_method.status_code == 422
+
+    # 6. Admin enrolls citizen with approved method and auditable reason -> 200 OK
     res_admin = client.post(
-        f"/api/v1/auth/users/{citizen.id}/verify-identity?provider=AADHAAR_MUNICIPAL",
+        f"/api/v1/auth/users/{citizen.id}/verify-identity",
+        json=valid_payload,
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert res_admin.status_code == 200
     res_data = res_admin.json()
     assert res_data["is_identity_verified"] is True
-    assert res_data["identity_provider"] == "AADHAAR_MUNICIPAL"
+    assert res_data["identity_provider"] == "MUNICIPAL_DESK_IN_PERSON"
 
     db_session.refresh(citizen)
     assert citizen.is_identity_verified is True
-    assert citizen.identity_provider == "AADHAAR_MUNICIPAL"
+    assert citizen.identity_provider == "MUNICIPAL_DESK_IN_PERSON"
 
 
 def test_trusted_identity_citizens_can_auto_resolve_under_conservative_policy(db_session):
