@@ -18,13 +18,18 @@ import app.models # noqa
 # access to the values within the .ini file in use.
 config = context.config
 
-# Set sqlalchemy.url: priority given to TEST_DATABASE_URL, then explicit DATABASE_URL / config / settings
-target_url = (
-    os.environ.get("TEST_DATABASE_URL")
-    or os.environ.get("DATABASE_URL")
-    or config.get_main_option("sqlalchemy.url")
-    or settings.DATABASE_URL
-)
+# Set sqlalchemy.url:
+# If caller programmatically configured a custom URL (and not the alembic.ini dummy placeholder), honor it.
+# Otherwise, take TEST_DATABASE_URL, DATABASE_URL, or settings.DATABASE_URL.
+configured_url = config.get_main_option("sqlalchemy.url")
+if configured_url and configured_url != "driver://user:pass@localhost/dbname":
+    target_url = configured_url
+else:
+    target_url = (
+        os.environ.get("TEST_DATABASE_URL")
+        or os.environ.get("DATABASE_URL")
+        or settings.DATABASE_URL
+    )
 config.set_main_option("sqlalchemy.url", target_url)
 
 # Interpret the config file for Python logging.
