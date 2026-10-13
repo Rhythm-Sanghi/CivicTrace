@@ -1,9 +1,9 @@
 from typing import List, Optional
-from datetime import datetime, timezone
 import os
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.db.session import get_db
 from app.core.config import settings
 from app.core.rate_limiter import check_rate_limit
@@ -20,6 +20,7 @@ from app.models.entities import (
     RecurrenceRelationship,
     Department,
     CaseAssignment,
+    ReportModerationStatus,
 )
 from app.schemas.all_schemas import (
     CasePublic,
@@ -37,8 +38,10 @@ from app.services.state_machine import CaseStateMachine
 from app.services.ledger import LedgerService
 from app.services.export_service import ExportService
 from app.services.verification_policy import VerificationPolicyEngine
+from app.services.priority_engine import PriorityEngine
 
 router = APIRouter()
+
 
 @router.get("", response_model=List[CasePublic])
 def list_cases(
@@ -50,6 +53,7 @@ def list_cases(
     max_lat: Optional[float] = None,
     min_lon: Optional[float] = None,
     max_lon: Optional[float] = None,
+    skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
 ):
     query = db.query(Case)
@@ -66,22 +70,40 @@ def list_cases(
     if min_lon is not None and max_lon is not None:
         query = query.filter(Case.longitude.between(min_lon, max_lon))
 
-    cases = query.order_by(Case.priority_score.desc(), Case.created_at.desc()).limit(limit).all()
-    # Populate report counts
+    cases = (
+        query.order_by(Case.priority_score.desc(), Case.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    # Populate report counts (only counting approved corroborating reports)
     for c in cases:
-        c.report_count = len(c.reports)
+        c.report_count = sum(
+            1 for r in c.reports if r.moderation_status == ReportModerationStatus.APPROVED
+        )
     return cases
+
 
 @router.get("/neighborhood/stats", response_model=NeighborhoodStats)
 def get_neighborhood_stats(db: Session = Depends(get_db)):
     """Computes real live dashboard metrics from the database without hardcoded numbers."""
     cases = db.query(Case).all()
-    total_reports = db.query(Report).count()
+    total_reports = (
+        db.query(Report).filter(Report.moderation_status == ReportModerationStatus.APPROVED).count()
+    )
 
-    open_states = [CaseState.SUBMITTED, CaseState.UNDER_REVIEW, CaseState.VERIFIED, CaseState.ASSIGNED, CaseState.IN_PROGRESS]
+    open_states = [
+        CaseState.SUBMITTED,
+        CaseState.UNDER_REVIEW,
+        CaseState.VERIFIED,
+        CaseState.ASSIGNED,
+        CaseState.IN_PROGRESS,
+        CaseState.REOPENED,
+    ]
     open_cases = sum(1 for c in cases if c.state in open_states)
     verified_resolutions = sum(1 for c in cases if c.state == CaseState.RESOLVED)
     disputed_resolutions = sum(1 for c in cases if c.state == CaseState.DISPUTED)
+    reopened_cases = sum(1 for c in cases if c.state == CaseState.REOPENED)
     awaiting_verification = sum(1 for c in cases if c.state == CaseState.AWAITING_VERIFICATION)
 
     # Resolution duration calculations for truly resolved cases
@@ -94,8 +116,12 @@ def get_neighborhood_stats(db: Session = Depends(get_db)):
     median_days = 0.0
     if resolution_durations_days:
         sorted_days = sorted(resolution_durations_days)
-        mid = len(sorted_days) // 2
-        median_days = round(sorted_days[mid], 1)
+        n = len(sorted_days)
+        if n % 2 == 1:
+            median_days = round(sorted_days[n // 2], 1)
+        else:
+            mid = n // 2
+            median_days = round((sorted_days[mid - 1] + sorted_days[mid]) / 2.0, 1)
 
     category_counts = {}
     for c in cases:
@@ -112,6 +138,7 @@ def get_neighborhood_stats(db: Session = Depends(get_db)):
         "open_cases": open_cases,
         "verified_resolutions": verified_resolutions,
         "disputed_resolutions": disputed_resolutions,
+        "reopened_cases": reopened_cases,
         "awaiting_verification": awaiting_verification,
         "total_reports": total_reports,
         "median_resolution_days": median_days,
@@ -119,20 +146,30 @@ def get_neighborhood_stats(db: Session = Depends(get_db)):
         "priority_counts": priority_counts,
     }
 
+
 @router.get("/{case_id}", response_model=CasePublic)
 def get_case(case_id: str, db: Session = Depends(get_db)):
     case = db.query(Case).filter((Case.id == case_id) | (Case.public_id == case_id)).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
-    case.report_count = len(case.reports)
+    case.report_count = sum(
+        1 for r in case.reports if r.moderation_status == ReportModerationStatus.APPROVED
+    )
     return case
+
 
 @router.get("/{case_id}/events", response_model=List[CaseEventPublic])
 def get_case_events(case_id: str, db: Session = Depends(get_db)):
     case = db.query(Case).filter((Case.id == case_id) | (Case.public_id == case_id)).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
-    return db.query(CaseEvent).filter(CaseEvent.case_id == case.id).order_by(CaseEvent.event_index.asc()).all()
+    return (
+        db.query(CaseEvent)
+        .filter(CaseEvent.case_id == case.id)
+        .order_by(CaseEvent.event_index.asc())
+        .all()
+    )
+
 
 @router.get("/{case_id}/events/verify", response_model=CaseEventChainValidation)
 def verify_case_events_ledger(case_id: str, db: Session = Depends(get_db)):
@@ -149,6 +186,20 @@ def verify_case_events_ledger(case_id: str, db: Session = Depends(get_db)):
         "latest_event_hash": latest_hash,
     }
 
+
+@router.post("/recalculate-priorities")
+def recalculate_priorities(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.REVIEWER, UserRole.ADMINISTRATOR)),
+):
+    """
+    Reviewer/Administrator trigger to refresh dynamic civic priority scores
+    across all open cases taking into account time elapsed and corroborated reports.
+    """
+    updated = PriorityEngine.recalculate_open_case_priorities(db)
+    return {"status": "success", "updated_cases": updated}
+
+
 @router.post("/{case_id}/transition", response_model=CasePublic)
 def transition_case_state(
     case_id: str,
@@ -160,6 +211,21 @@ def transition_case_state(
     case = db.query(Case).filter((Case.id == case_id) | (Case.public_id == case_id)).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+
+    # Issue 01 & 07: Operator department-scoped verification
+    if current_user.role == UserRole.OPERATOR:
+        latest_assignment = (
+            db.query(CaseAssignment)
+            .filter(CaseAssignment.case_id == case.id)
+            .order_by(CaseAssignment.assigned_at.desc())
+            .first()
+        )
+        if latest_assignment and latest_assignment.department_id and current_user.department_id:
+            if current_user.department_id != latest_assignment.department_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Department scope mismatch: operator is not assigned to the department handling this case.",
+                )
 
     try:
         CaseStateMachine.transition_case(
@@ -176,6 +242,7 @@ def transition_case_state(
     db.refresh(case)
     case.report_count = len(case.reports)
     return case
+
 
 @router.post("/{case_id}/assign", response_model=CasePublic)
 def assign_case_department(
@@ -199,21 +266,28 @@ def assign_case_department(
         notes=notes,
     )
     db.add(assignment)
-    case.state = CaseState.ASSIGNED
 
-    LedgerService.append_event(
-        db=db,
-        case=case,
-        event_type="CASE_ASSIGNED",
-        payload={"department_name": department.name, "assigned_by": current_user.display_name, "notes": notes},
-        actor=current_user,
-        public_actor_label="Community Reviewer",
-    )
+    try:
+        CaseStateMachine.transition_case(
+            db=db,
+            case=case,
+            target_state=CaseState.ASSIGNED,
+            actor=current_user,
+            event_type="CASE_ASSIGNED",
+            custom_payload={
+                "department_name": department.name,
+                "assigned_by": current_user.display_name,
+                "notes": notes,
+            },
+        )
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
 
     db.commit()
     db.refresh(case)
     case.report_count = len(case.reports)
     return case
+
 
 @router.post("/{case_id}/claims", response_model=ResolutionClaimPublic)
 def submit_resolution_claim(
@@ -226,6 +300,59 @@ def submit_resolution_claim(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
+    # Issue 01: Validate eligible prior states
+    eligible_states = [CaseState.ASSIGNED, CaseState.IN_PROGRESS, CaseState.DISPUTED]
+    if case.state not in eligible_states:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Resolution claims cannot be filed against case in '{case.state.value}' state. Must be ASSIGNED, IN_PROGRESS, or DISPUTED.",
+        )
+
+    # Issue 01: Verify department-scoped operator authorization (unless Administrator override)
+    latest_assignment = (
+        db.query(CaseAssignment)
+        .filter(CaseAssignment.case_id == case.id)
+        .order_by(CaseAssignment.assigned_at.desc())
+        .first()
+    )
+    if current_user.role == UserRole.OPERATOR:
+        if latest_assignment and latest_assignment.department_id:
+            if (
+                current_user.department_id
+                and current_user.department_id != latest_assignment.department_id
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Department scope mismatch: operator is not assigned to the department handling this case.",
+                )
+        elif latest_assignment is None and not current_user.department_id:
+            # If neither case nor operator is tied to a specific department in unconfigured setups, log warning or allow
+            pass
+        elif latest_assignment is None and current_user.department_id:
+            # Auto-record assignment for the operator's department
+            auto_assign = CaseAssignment(
+                case_id=case.id,
+                department_id=current_user.department_id,
+                assigned_by_id=current_user.id,
+                notes="Automatic department assignment upon operator work claim",
+            )
+            db.add(auto_assign)
+            db.flush()
+
+    # Issue 01: Prevent multiple simultaneous active claims
+    existing_active_claim = (
+        db.query(ResolutionClaim)
+        .filter(
+            ResolutionClaim.case_id == case.id, ResolutionClaim.status == "AWAITING_VERIFICATION"
+        )
+        .first()
+    )
+    if existing_active_claim:
+        raise HTTPException(
+            status_code=400,
+            detail="An active resolution claim is already pending verification for this case.",
+        )
+
     claim = ResolutionClaim(
         case_id=case.id,
         operator_id=current_user.id,
@@ -235,30 +362,44 @@ def submit_resolution_claim(
     )
     db.add(claim)
 
-    # Update case state explicitly to AWAITING_VERIFICATION
-    case.state = CaseState.AWAITING_VERIFICATION
+    # Issue 14: Centralized State Machine Transition with atomic ledger appending
+    try:
+        CaseStateMachine.transition_case(
+            db=db,
+            case=case,
+            target_state=CaseState.AWAITING_VERIFICATION,
+            actor=current_user,
+            event_type="RESOLUTION_CLAIMED",
+            custom_payload={
+                "work_summary": claim_in.work_summary,
+                "actions_taken": claim_in.actions_taken,
+                "operator_id": current_user.display_name,
+                "department_id": latest_assignment.department_id
+                if latest_assignment
+                else getattr(current_user, "department_id", None),
+            },
+        )
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
 
-    LedgerService.append_event(
-        db=db,
-        case=case,
-        event_type="RESOLUTION_CLAIMED",
-        payload={
-            "work_summary": claim_in.work_summary,
-            "actions_taken": claim_in.actions_taken,
-            "operator_id": current_user.display_name,
-        },
-        actor=current_user,
-        public_actor_label="Public Works Operator",
-    )
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="An active resolution claim is already pending verification for this case.",
+        )
 
-    db.commit()
     db.refresh(claim)
     return claim
+
 
 @router.post("/{case_id}/verifications", response_model=VerificationPublic)
 def submit_verification_observation(
     case_id: str,
     verif_in: VerificationCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
@@ -266,6 +407,13 @@ def submit_verification_observation(
     Independent resolution verification submitted by citizen observer or reviewer.
     Demonstrates crucial rule: Operators CANNOT verify their own resolution claims.
     """
+    check_rate_limit(
+        request,
+        max_requests=settings.RATE_LIMIT_REPORT_MAX,
+        window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+        action_key="submit_verification",
+    )
+
     case = db.query(Case).filter((Case.id == case_id) | (Case.public_id == case_id)).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -278,21 +426,26 @@ def submit_verification_observation(
     )
 
     try:
-        target_state, event_type, actor_label = VerificationPolicyEngine.evaluate_verification_submission(
-            db=db,
-            case=case,
-            user=current_user,
-            outcome=verif_in.outcome,
-            notes=verif_in.notes,
-            guest_pseudonym=verif_in.guest_pseudonym,
-            active_claim=active_claim,
+        target_state, event_type, actor_label = (
+            VerificationPolicyEngine.evaluate_verification_submission(
+                db=db,
+                case=case,
+                user=current_user,
+                outcome=verif_in.outcome,
+                notes=verif_in.notes,
+                guest_pseudonym=verif_in.guest_pseudonym,
+                active_claim=active_claim,
+            )
         )
     except PermissionError as pe:
         raise HTTPException(status_code=403, detail=str(pe))
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
 
-    is_dispute = verif_in.outcome in [VerificationOutcome.STILL_UNRESOLVED, VerificationOutcome.PARTIALLY_FIXED]
+    is_dispute = verif_in.outcome in [
+        VerificationOutcome.STILL_UNRESOLVED,
+        VerificationOutcome.PARTIALLY_FIXED,
+    ]
 
     observation = VerificationObservation(
         case_id=case.id,
@@ -305,27 +458,51 @@ def submit_verification_observation(
     )
     db.add(observation)
 
-    case.state = target_state
-    if target_state == CaseState.RESOLVED and not case.resolved_at:
-        case.resolved_at = datetime.now(timezone.utc)
-
-    LedgerService.append_event(
-        db=db,
-        case=case,
-        event_type=event_type,
-        payload={
-            "outcome": verif_in.outcome.value,
-            "notes": verif_in.notes,
-            "is_dispute": is_dispute,
-            "resulting_case_state": target_state.value,
-        },
-        actor=current_user,
-        public_actor_label=actor_label,
-    )
+    if target_state != case.state:
+        try:
+            # Issue 14: Centralized state machine transition with atomic ledger event
+            CaseStateMachine.transition_case(
+                db=db,
+                case=case,
+                target_state=target_state,
+                actor=current_user
+                if current_user
+                else User(
+                    email="guest@civictrace.local",
+                    hashed_password="",
+                    display_name=actor_label,
+                    role=UserRole.CITIZEN,
+                ),
+                event_type=event_type,
+                custom_payload={
+                    "outcome": verif_in.outcome.value,
+                    "notes": verif_in.notes,
+                    "is_dispute": is_dispute,
+                    "resulting_case_state": target_state.value,
+                },
+            )
+        except PermissionError as pe:
+            raise HTTPException(status_code=403, detail=str(pe))
+    else:
+        # State unchanged; record the logged observation on append-only ledger
+        LedgerService.append_event(
+            db=db,
+            case=case,
+            event_type=event_type,
+            payload={
+                "outcome": verif_in.outcome.value,
+                "notes": verif_in.notes,
+                "is_dispute": is_dispute,
+                "resulting_case_state": case.state.value,
+            },
+            actor=current_user,
+            public_actor_label=actor_label,
+        )
 
     db.commit()
     db.refresh(observation)
     return observation
+
 
 @router.get("/{case_id}/claims", response_model=List[ResolutionClaimPublic])
 def list_case_claims(case_id: str, db: Session = Depends(get_db)):
@@ -334,12 +511,16 @@ def list_case_claims(case_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Case not found")
     return db.query(ResolutionClaim).filter(ResolutionClaim.case_id == case.id).all()
 
+
 @router.get("/{case_id}/verifications", response_model=List[VerificationPublic])
 def list_case_verifications(case_id: str, db: Session = Depends(get_db)):
     case = db.query(Case).filter((Case.id == case_id) | (Case.public_id == case_id)).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
-    return db.query(VerificationObservation).filter(VerificationObservation.case_id == case.id).all()
+    return (
+        db.query(VerificationObservation).filter(VerificationObservation.case_id == case.id).all()
+    )
+
 
 @router.get("/{case_id}/export")
 def export_case_evidence(case_id: str, request: Request, db: Session = Depends(get_db)):
@@ -347,7 +528,7 @@ def export_case_evidence(case_id: str, request: Request, db: Session = Depends(g
         request,
         max_requests=settings.RATE_LIMIT_EXPORT_MAX,
         window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
-        action_key="export_package"
+        action_key="export_package",
     )
     case = db.query(Case).filter((Case.id == case_id) | (Case.public_id == case_id)).first()
     if not case:
@@ -359,6 +540,7 @@ def export_case_evidence(case_id: str, request: Request, db: Session = Depends(g
         filename=os.path.basename(zip_path),
         media_type="application/zip",
     )
+
 
 @router.get("/recurrence/relationships", response_model=List[RecurrencePublic])
 def list_recurrences(db: Session = Depends(get_db)):

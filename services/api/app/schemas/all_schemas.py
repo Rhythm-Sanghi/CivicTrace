@@ -9,18 +9,22 @@ from app.models.entities import (
     PriorityBand,
 )
 
+
 # User schemas
 class UserBase(BaseModel):
     email: str
     display_name: str
     role: UserRole = UserRole.CITIZEN
 
+
 class UserCreate(UserBase):
     password: str
+
 
 class UserLogin(BaseModel):
     email: str
     password: str
+
 
 class UserPublic(BaseModel):
     id: str
@@ -28,14 +32,18 @@ class UserPublic(BaseModel):
     display_name: str
     role: UserRole
     department_id: Optional[str] = None
+    is_identity_verified: bool = False
+    identity_provider: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class Token(BaseModel):
     access_token: Optional[str] = None
     token_type: str = "bearer"
     user: UserPublic
+
 
 # Category schemas
 class CategoryPublic(BaseModel):
@@ -46,6 +54,7 @@ class CategoryPublic(BaseModel):
     default_severity_weight: float
 
     model_config = ConfigDict(from_attributes=True)
+
 
 # Evidence Asset
 class EvidenceAssetPublic(BaseModel):
@@ -59,6 +68,7 @@ class EvidenceAssetPublic(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 # Report schemas
 class ReportCreate(BaseModel):
     category_id: str
@@ -69,6 +79,7 @@ class ReportCreate(BaseModel):
     address_reference: Optional[str] = None
     accuracy_meters: Optional[float] = None
     guest_pseudonym: Optional[str] = None
+
 
 class ReportPublic(BaseModel):
     id: str
@@ -88,9 +99,19 @@ class ReportPublic(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class ReportCreateResponse(ReportPublic):
+    upload_token: Optional[str] = (
+        None  # Scoped upload capability token (returned strictly once to original submitter)
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ReportModerationRequest(BaseModel):
     decision: ReportModerationStatus
     notes: Optional[str] = None
+
 
 # Case schemas
 class CasePublic(BaseModel):
@@ -116,6 +137,7 @@ class CasePublic(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 # Duplicate Candidate
 class DuplicateCandidatePublic(BaseModel):
     id: str
@@ -134,9 +156,11 @@ class DuplicateCandidatePublic(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class DuplicateDecision(BaseModel):
-    decision: str # "APPROVE" or "REJECT"
+    decision: str  # "APPROVE" or "REJECT"
     notes: Optional[str] = None
+
 
 # Case Event Ledger
 class CaseEventPublic(BaseModel):
@@ -153,6 +177,7 @@ class CaseEventPublic(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class CaseEventChainValidation(BaseModel):
     case_id: str
     is_valid: bool
@@ -160,10 +185,12 @@ class CaseEventChainValidation(BaseModel):
     error_message: Optional[str] = None
     latest_event_hash: Optional[str] = None
 
+
 # Resolution Claim
 class ResolutionClaimCreate(BaseModel):
     work_summary: str = Field(..., min_length=10)
     actions_taken: str = Field(..., min_length=10)
+
 
 class ResolutionClaimPublic(BaseModel):
     id: str
@@ -176,11 +203,13 @@ class ResolutionClaimPublic(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 # Verification
 class VerificationCreate(BaseModel):
     outcome: VerificationOutcome
     notes: str = Field(..., min_length=5)
     guest_pseudonym: Optional[str] = None
+
 
 class VerificationPublic(BaseModel):
     id: str
@@ -194,6 +223,7 @@ class VerificationPublic(BaseModel):
     evidence_assets: List[EvidenceAssetPublic] = []
 
     model_config = ConfigDict(from_attributes=True)
+
 
 # Recurrence
 class RecurrencePublic(BaseModel):
@@ -210,12 +240,14 @@ class RecurrencePublic(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 # Neighborhood Metrics
 class NeighborhoodStats(BaseModel):
     service_area: str
     open_cases: int
     verified_resolutions: int
     disputed_resolutions: int
+    reopened_cases: Optional[int] = 0
     awaiting_verification: int
     total_reports: int
     median_resolution_days: float

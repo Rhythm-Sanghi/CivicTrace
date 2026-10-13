@@ -12,14 +12,17 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     Enum as SQLEnum,
-    Index
+    Index,
+    text,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.session import Base
 
+
 def generate_uuid() -> str:
     return str(uuid.uuid4())
+
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -76,6 +79,8 @@ class User(Base):
     display_name = Column(String(100), nullable=False)
     role = Column(SQLEnum(UserRole), default=UserRole.CITIZEN, nullable=False)
     department_id = Column(String(36), ForeignKey("departments.id"), nullable=True)
+    is_identity_verified = Column(Boolean, default=False, nullable=False)
+    identity_provider = Column(String(50), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
@@ -121,7 +126,9 @@ class IssueCategory(Base):
     name = Column(String(100), unique=True, nullable=False)
     code = Column(String(50), unique=True, nullable=False)
     description = Column(Text, nullable=True)
-    default_severity_weight = Column(Float, default=1.0, nullable=False) # Factor for civic priority
+    default_severity_weight = Column(
+        Float, default=1.0, nullable=False
+    )  # Factor for civic priority
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     reports = relationship("Report", back_populates="category")
@@ -132,10 +139,12 @@ class Report(Base):
     __tablename__ = "reports"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
-    public_id = Column(String(30), unique=True, index=True, nullable=False) # E.g., RPT-2026-0001
+    public_id = Column(String(30), unique=True, index=True, nullable=False)  # E.g., RPT-2026-0001
     category_id = Column(String(36), ForeignKey("issue_categories.id"), nullable=False)
-    reporter_id = Column(String(36), ForeignKey("users.id"), nullable=True) # None for guest reporting
-    guest_pseudonym = Column(String(100), nullable=True) # Privacy-preserving pseudonym for guest
+    reporter_id = Column(
+        String(36), ForeignKey("users.id"), nullable=True
+    )  # None for guest reporting
+    guest_pseudonym = Column(String(100), nullable=True)  # Privacy-preserving pseudonym for guest
 
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=False)
@@ -144,27 +153,40 @@ class Report(Base):
     address_reference = Column(String(255), nullable=True)
     accuracy_meters = Column(Float, nullable=True)
 
-    moderation_status = Column(SQLEnum(ReportModerationStatus), default=ReportModerationStatus.APPROVED, nullable=False)
+    moderation_status = Column(
+        SQLEnum(ReportModerationStatus), default=ReportModerationStatus.APPROVED, nullable=False
+    )
     moderation_notes = Column(Text, nullable=True)
 
     case_id = Column(String(36), ForeignKey("cases.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+    upload_capability_token_hash = Column(
+        String(64), nullable=True
+    )  # SHA-256 capability hash for guest uploads
 
     category = relationship("IssueCategory", back_populates="reports")
     reporter = relationship("User", back_populates="reports")
     case = relationship("Case", back_populates="reports")
     evidence_assets = relationship("EvidenceAsset", back_populates="report")
 
-    __table_args__ = (
-        Index("idx_reports_coords", "latitude", "longitude"),
-    )
+    __table_args__ = (Index("idx_reports_coords", "latitude", "longitude"),)
+
+
+class RevokedToken(Base):
+    __tablename__ = "revoked_tokens"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    token_hash = Column(String(64), unique=True, index=True, nullable=False)
+    expires_at = Column(Float, nullable=False)
+    revoked_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
 class Case(Base):
     __tablename__ = "cases"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
-    public_id = Column(String(30), unique=True, index=True, nullable=False) # E.g., CAS-2026-0001
+    public_id = Column(String(30), unique=True, index=True, nullable=False)  # E.g., CAS-2026-0001
     category_id = Column(String(36), ForeignKey("issue_categories.id"), nullable=False)
     service_area_id = Column(String(36), ForeignKey("service_areas.id"), nullable=True)
 
@@ -177,7 +199,7 @@ class Case(Base):
     state = Column(SQLEnum(CaseState), default=CaseState.SUBMITTED, nullable=False)
     priority_score = Column(Float, default=1.0, nullable=False)
     priority_band = Column(SQLEnum(PriorityBand), default=PriorityBand.LOW, nullable=False)
-    priority_breakdown = Column(Text, nullable=True) # JSON explainability string
+    priority_breakdown = Column(Text, nullable=True)  # JSON explainability string
 
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
@@ -211,9 +233,9 @@ class DuplicateCandidate(Base):
     category_score = Column(Float, nullable=False)
     temporal_score = Column(Float, nullable=False)
     composite_score = Column(Float, nullable=False)
-    explanation = Column(Text, nullable=False) # JSON or markdown rationale
+    explanation = Column(Text, nullable=False)  # JSON or markdown rationale
 
-    status = Column(String(20), default="PENDING", nullable=False) # PENDING, APPROVED, REJECTED
+    status = Column(String(20), default="PENDING", nullable=False)  # PENDING, APPROVED, REJECTED
     reviewed_by_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
@@ -242,16 +264,19 @@ class CaseEvent(Base):
     """
     Append-only evidence and accountability ledger with SHA-256 hash chaining.
     """
+
     __tablename__ = "case_events"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     case_id = Column(String(36), ForeignKey("cases.id"), nullable=False)
-    event_index = Column(Integer, nullable=False) # 1-based sequential index for this case
+    event_index = Column(Integer, nullable=False)  # 1-based sequential index for this case
     event_type = Column(String(50), nullable=False)
     actor_id = Column(String(36), ForeignKey("users.id"), nullable=True)
-    public_actor_label = Column(String(100), nullable=False) # E.g., "Citizen Observer", "Public Works Operator"
+    public_actor_label = Column(
+        String(100), nullable=False
+    )  # E.g., "Citizen Observer", "Public Works Operator"
 
-    payload_json = Column(Text, nullable=False) # Canonical JSON string
+    payload_json = Column(Text, nullable=False)  # Canonical JSON string
     schema_version = Column(Integer, default=1, nullable=False)
     previous_event_hash = Column(String(64), nullable=False)
     current_event_hash = Column(String(64), nullable=False)
@@ -260,9 +285,7 @@ class CaseEvent(Base):
     case = relationship("Case", back_populates="events")
     actor = relationship("User", back_populates="case_events")
 
-    __table_args__ = (
-        Index("idx_case_events_case_idx", "case_id", "event_index", unique=True),
-    )
+    __table_args__ = (Index("idx_case_events_case_idx", "case_id", "event_index", unique=True),)
 
 
 class EvidenceAsset(Base):
@@ -298,12 +321,24 @@ class ResolutionClaim(Base):
     work_summary = Column(Text, nullable=False)
     actions_taken = Column(Text, nullable=False)
     claimed_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
-    status = Column(String(30), default="AWAITING_VERIFICATION", nullable=False) # AWAITING_VERIFICATION, VERIFIED, DISPUTED
+    status = Column(
+        String(30), default="AWAITING_VERIFICATION", nullable=False
+    )  # AWAITING_VERIFICATION, VERIFIED, DISPUTED
 
     case = relationship("Case", back_populates="resolution_claims")
     operator = relationship("User")
     evidence_assets = relationship("EvidenceAsset", back_populates="resolution_claim")
     verifications = relationship("VerificationObservation", back_populates="resolution_claim")
+
+    __table_args__ = (
+        Index(
+            "uq_active_resolution_claim_per_case",
+            "case_id",
+            unique=True,
+            sqlite_where=text("status = 'AWAITING_VERIFICATION'"),
+            postgresql_where=text("status = 'AWAITING_VERIFICATION'"),
+        ),
+    )
 
 
 class VerificationObservation(Base):
@@ -312,7 +347,9 @@ class VerificationObservation(Base):
     id = Column(String(36), primary_key=True, default=generate_uuid)
     case_id = Column(String(36), ForeignKey("cases.id"), nullable=False)
     resolution_claim_id = Column(String(36), ForeignKey("resolution_claims.id"), nullable=True)
-    verifier_id = Column(String(36), ForeignKey("users.id"), nullable=True) # Citizen verifier or guest
+    verifier_id = Column(
+        String(36), ForeignKey("users.id"), nullable=True
+    )  # Citizen verifier or guest
     guest_pseudonym = Column(String(100), nullable=True)
 
     outcome = Column(SQLEnum(VerificationOutcome), nullable=False)
@@ -350,4 +387,20 @@ class IntegrityCheckpoint(Base):
     checkpoint_index = Column(Integer, unique=True, nullable=False)
     total_events_covered = Column(Integer, nullable=False)
     root_hash = Column(String(64), nullable=False)
+    signature = Column(Text, nullable=True)
+    signer_public_key = Column(Text, nullable=True)
+    signature_algorithm = Column(String(32), default="Ed25519", nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class SequenceCounter(Base):
+    """
+    Database-enforced monotonic sequence allocator for public identifiers and per-case events.
+    Enforces multi-process safe, collision-resistant monotonic counter sequences in PostgreSQL and SQLite.
+    """
+
+    __tablename__ = "sequence_counters"
+
+    name = Column(String(100), primary_key=True)
+    next_value = Column(Integer, nullable=False, default=1)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
