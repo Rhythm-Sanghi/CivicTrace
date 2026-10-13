@@ -26,7 +26,7 @@ from app.models.entities import (
 from app.services.state_machine import CaseStateMachine
 from app.services.ledger import LedgerService
 from app.core.security import clean_expired_revoked_tokens
-from app.tests.conftest import validate_test_database_safety, TestingSessionLocal
+from app.tests.conftest import validate_test_database_safety, TestingSessionLocal, TEST_DB_URL
 
 
 def test_safety_guard_rejects_unsafe_databases():
@@ -37,19 +37,28 @@ def test_safety_guard_rejects_unsafe_databases():
     - Target is the development SQLite database (civictrace_dev.db).
     - Target is an unconfirmed PostgreSQL database (lacking 'test' in its name).
     """
-    # 1. Rejects production URLs
+    # 1. Rejects production URLs (even if 'test' is included in the name)
     with pytest.raises(RuntimeError, match="SAFETY ABORT"):
         validate_test_database_safety("postgresql://user:pass@localhost:5432/civictrace_production")
 
     with pytest.raises(RuntimeError, match="SAFETY ABORT"):
         validate_test_database_safety("postgresql://user:pass@localhost:5432/civictrace_live")
 
-    # 2. Rejects default local development SQLite database
+    with pytest.raises(RuntimeError, match="SAFETY ABORT"):
+        validate_test_database_safety("postgresql://user:pass@localhost:5432/test_production")
+
+    with pytest.raises(RuntimeError, match="SAFETY ABORT"):
+        validate_test_database_safety("postgresql://user:pass@localhost:5432/prod_test_db")
+
+    # 2. Rejects development databases (even if 'test' is included)
     with pytest.raises(RuntimeError, match="SAFETY ABORT"):
         validate_test_database_safety("sqlite:///./civictrace_dev.db")
 
     with pytest.raises(RuntimeError, match="SAFETY ABORT"):
-        validate_test_database_safety("sqlite:///C:/path/to/civictrace_dev.db")
+        validate_test_database_safety("sqlite:///./test_civictrace_dev.db")
+
+    with pytest.raises(RuntimeError, match="SAFETY ABORT"):
+        validate_test_database_safety("postgresql://user:pass@localhost:5432/civictrace_dev_test")
 
     # 3. Rejects PostgreSQL database without 'test' in the DB name
     with pytest.raises(RuntimeError, match="SAFETY ABORT"):
@@ -549,3 +558,22 @@ def test_integration_migrations_empty_and_populated_schema(tmp_path):
         assert c_row[1] == "Prior Case"
 
     p_engine.dispose()
+
+
+def test_integration_postgresql_dialect_and_server_verified(db_session):
+    """
+    Verification: Asserts that when running in a PostgreSQL-targeted environment (such as in CI backend-postgres-test),
+    the test runner genuinely executes against the PostgreSQL dialect and not falling back to SQLite.
+    When TEST_DB_URL targets PostgreSQL, asserts dialect name is 'postgresql' and PostgreSQL server version is queryable.
+    """
+    dialect_name = db_session.bind.dialect.name
+    if "postgres" in TEST_DB_URL.lower():
+        assert dialect_name == "postgresql", (
+            f"Expected PostgreSQL dialect when TEST_DB_URL targets PostgreSQL, but got '{dialect_name}'"
+        )
+        version = db_session.execute(text("SELECT version()")).scalar()
+        assert "PostgreSQL" in version, f"Expected PostgreSQL version output, got '{version}'"
+    else:
+        # On local/SQLite runner, verify it is SQLite
+        assert dialect_name == "sqlite", f"Expected SQLite dialect when on default local test DB, got '{dialect_name}'"
+

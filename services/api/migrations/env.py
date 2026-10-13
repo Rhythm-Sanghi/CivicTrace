@@ -18,10 +18,10 @@ import app.models # noqa
 # access to the values within the .ini file in use.
 config = context.config
 
-# Set sqlalchemy.url: priority given to explicit environment or config override, then settings.DATABASE_URL
+# Set sqlalchemy.url: priority given to TEST_DATABASE_URL, then explicit DATABASE_URL / config / settings
 target_url = (
-    os.environ.get("DATABASE_URL")
-    or os.environ.get("TEST_DATABASE_URL")
+    os.environ.get("TEST_DATABASE_URL")
+    or os.environ.get("DATABASE_URL")
     or config.get_main_option("sqlalchemy.url")
     or settings.DATABASE_URL
 )

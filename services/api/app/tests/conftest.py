@@ -14,23 +14,21 @@ def validate_test_database_safety(db_url: str) -> None:
     Fail-Safe Guard:
     Guarantees that database setup and teardown can NEVER modify development or production data.
     Fails closed if the test database identity or isolation cannot be confirmed.
+    Destructive test setup cannot target production or ordinary development databases
+    merely because their names contain 'test'.
     """
     lower_url = db_url.lower()
 
-    # Reject explicit production keywords
-    forbidden_terms = ["prod", "production", "live"]
+    # Unconditionally reject production and development terms, even if 'test' is present
+    forbidden_terms = ["prod", "production", "live", "dev", "development"]
     for term in forbidden_terms:
-        if term in lower_url and "test" not in lower_url:
+        if term in lower_url:
             raise RuntimeError(
-                f"SAFETY ABORT: Refusing to initialize test database against potential non-test database: {db_url}. "
+                f"SAFETY ABORT: Refusing to initialize test database against potential production or development database: {db_url}. "
                 f"Contains forbidden term '{term}'."
             )
 
     if lower_url.startswith("sqlite"):
-        if "civictrace_dev.db" in lower_url:
-            raise RuntimeError(
-                "SAFETY ABORT: Refusing to run tests against primary development database 'civictrace_dev.db'!"
-            )
         if "test" not in lower_url and ":memory:" not in lower_url:
             raise RuntimeError(
                 f"SAFETY ABORT: SQLite test database URL must explicitly contain 'test' or ':memory:': {db_url}"
@@ -47,8 +45,10 @@ def validate_test_database_safety(db_url: str) -> None:
         raise RuntimeError(f"SAFETY ABORT: Unsupported database dialect for test runner: {db_url}")
 
 
-# Determine test database URL: TEST_DATABASE_URL > DATABASE_URL > default SQLite test DB
-raw_url = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
+# Explicit disposable test database configuration:
+# Only use TEST_DATABASE_URL if explicitly configured in environment.
+# NEVER silently fall back to normal application DATABASE_URL.
+raw_url = os.environ.get("TEST_DATABASE_URL")
 if raw_url:
     validate_test_database_safety(raw_url)
     TEST_DB_URL = raw_url

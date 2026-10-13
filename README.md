@@ -107,7 +107,7 @@ cd services/api
 pytest app/tests/ -v
 ```
 
-**74/74 tests pass**, covering:
+**75/75 tests pass**, covering:
 1. Append-only SHA-256 hash chain verification and mathematical tamper detection
 2. Deterministic Haversine spatial correlation and priority calculation
 3. Conflict of interest enforcement: operators strictly blocked from self-verifying resolution claims (`403 Forbidden`)
