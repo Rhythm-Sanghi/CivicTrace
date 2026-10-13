@@ -49,6 +49,7 @@ test-results/
 *.sqlite
 *.sqlite3
 *.db
+*.zip
 storage/uploads/
 storage/exports/
 services/api/storage/uploads/

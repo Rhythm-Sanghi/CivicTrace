@@ -12,10 +12,10 @@ Built with a modular monolith architecture for **WarriorHacks 2.0** (Theme: Civi
 
 | Generic Complaint Portals | CivicTrace Evidence Ledger |
 | :--- | :--- |
-| **Disappearing Tickets:** Department marks "Closed" and ticket vanishes. | **Independent Verification Gate:** Repairs claimed by operators remain in `Awaiting Verification` until local citizens independently confirm resolution. |
+| **Disappearing Tickets:** Department marks "Closed" and ticket vanishes. | **Citizen Verification Gate:** Operator-claimed repairs remain in `Awaiting Verification` pending citizen observation. Under conservative verification policy, auto-closure requires trusted identity credentials; otherwise authorized reviewer sign-off is required. |
 | **Scattered Duplicates:** Multiple neighbors submit reports for the same pothole; each treated as isolated incidents. | **Deterministic Duplicate Engine:** Automatically correlates observations via Haversine proximity, vocabulary Jaccard similarity, and category weights into consolidated cases with preserved provenance. |
-| **Opaque Status Changes:** Timestamps and notes can be edited or deleted by database administrators. | **Append-Only Cryptographic Ledger:** Every status change, assignment, work claim, and inspection is linked via SHA-256 hash chaining. Tampering is mathematically detectable. |
-| **Memoryless Systems:** Repaired roads break down again 2 weeks later; previous history is erased. | **Chronic Recurrence Intelligence:** Tracks road and pipe failures re-emerging at the same coordinates within 30 days. |
+| **Opaque Status Changes:** Timestamps and notes can be edited or deleted by database administrators. | **Tamper-Evident Cryptographic Ledger:** Every status change, assignment, work claim, and inspection is linked via SHA-256 hash chaining. Event modifications are mathematically detectable, and external Ed25519 checkpoints protect against full database rewrites. |
+| **Memoryless Systems:** Repaired roads break down again 2 weeks later; previous history is erased. | **Chronic Recurrence Intelligence:** Tracks road and pipe failures re-emerging at the same coordinates (50-meter radius) within 60 days. |
 | **Locked Data:** Data trapped inside proprietary municipal silos. | **Portable Evidence Package:** Exports ZIP evidence packages containing JSON timelines and SHA-256 integrity manifests. |
 
 ---
@@ -48,7 +48,7 @@ python -m app.db.seed
 # 5. Start the FastAPI backend server
 uvicorn app.main:app --reload --port 8000
 ```
-API Documentation will be live at: **`http://localhost:8000/docs`**
+API Documentation will be live at: **`http://localhost:8000/api/v1/docs`** (ReDoc: **`http://localhost:8000/api/v1/redoc`**)
 
 ---
 
@@ -107,7 +107,7 @@ cd services/api
 pytest app/tests/ -v
 ```
 
-**63/63 tests pass**, covering:
+**74/74 tests pass**, covering:
 1. Append-only SHA-256 hash chain verification and mathematical tamper detection
 2. Deterministic Haversine spatial correlation and priority calculation
 3. Conflict of interest enforcement: operators strictly blocked from self-verifying resolution claims (`403 Forbidden`)
@@ -160,6 +160,8 @@ pytest app/tests/ -v
 25. Constant-time dummy password hashing on authentication failures preventing account enumeration timing attacks
 26. HttpOnly cookie session support with explicit `/auth/logout` revocation
 27. Health check probe and service status reporting
+28. Fail-safe disposable test database configuration guard preventing execution against development or production databases
+29. Genuine PostgreSQL/PostGIS integration coverage: role boundaries, case lifecycle, duplicate adjudication, resolution claim unique constraints, cross-session token revocation, concurrent ledger writes, and schema migration correctness from empty to populated schemas
 
 ### Frontend Component Tests (Vitest)
 ```bash

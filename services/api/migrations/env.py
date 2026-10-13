@@ -18,8 +18,14 @@ import app.models # noqa
 # access to the values within the .ini file in use.
 config = context.config
 
-# Set sqlalchemy.url from our settings dynamically
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Set sqlalchemy.url: priority given to explicit environment or config override, then settings.DATABASE_URL
+target_url = (
+    os.environ.get("DATABASE_URL")
+    or os.environ.get("TEST_DATABASE_URL")
+    or config.get_main_option("sqlalchemy.url")
+    or settings.DATABASE_URL
+)
+config.set_main_option("sqlalchemy.url", target_url)
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:
@@ -28,13 +34,14 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+    url = config.get_main_option("sqlalchemy.url") or target_url
+    is_sqlite = "sqlite" in url.lower()
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        render_as_batch=True if "sqlite" in url else False,
+        render_as_batch=is_sqlite,
     )
 
     with context.begin_transaction():
@@ -42,6 +49,8 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     connectable = config.attributes.get("connection", None)
+    active_url = config.get_main_option("sqlalchemy.url") or target_url
+    is_sqlite = "sqlite" in active_url.lower()
 
     if connectable is None:
         connectable = engine_from_config(
@@ -54,7 +63,7 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            render_as_batch=True if "sqlite" in settings.DATABASE_URL else False,
+            render_as_batch=is_sqlite,
         )
 
         with context.begin_transaction():

@@ -1,49 +1,14 @@
 import pytest
 import os
 import zipfile
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.main import app
-from app.db.session import Base, get_db
 from app.models.entities import User, UserRole, IssueCategory
 from app.services.export_service import ExportService
 from app.core.security import get_password_hash, create_access_token
 
-TEST_DB_URL = "sqlite:///./test_e2e_civictrace.db"
-e2e_engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
-TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=e2e_engine)
-
-
-@pytest.fixture(scope="module")
-def setup_db():
-    Base.metadata.drop_all(bind=e2e_engine)
-    Base.metadata.create_all(bind=e2e_engine)
-    yield
-    Base.metadata.drop_all(bind=e2e_engine)
-
-
 @pytest.fixture
-def session(setup_db):
-    db = TestingSession()
-    try:
-        yield db
-    finally:
-        db.close()
+def session(db_session):
+    return db_session
 
-
-@pytest.fixture
-def client(session):
-    def override_get_db():
-        try:
-            yield session
-        finally:
-            pass
-
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
 
 
 def test_full_civic_accountability_lifecycle_e2e(client, session):
