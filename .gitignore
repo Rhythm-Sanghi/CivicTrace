@@ -53,6 +53,8 @@ storage/uploads/
 storage/exports/
 services/api/storage/uploads/
 services/api/storage/exports/
+storage/*.json
+services/api/storage/*.json
 !storage/uploads/.gitkeep
 !storage/exports/.gitkeep
 !services/api/storage/**/.gitkeep

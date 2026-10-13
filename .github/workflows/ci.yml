@@ -9,6 +9,20 @@ on:
 jobs:
   backend-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: civictrace_user
+          POSTGRES_PASSWORD: civictrace_secure_password
+          POSTGRES_DB: civictrace_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -23,13 +37,20 @@ jobs:
         run: |
           cd services/api
           ruff check .
-      - name: Verify Migrations Apply Cleanly
+      - name: Verify Migrations Apply Cleanly (SQLite)
         run: |
           cd services/api
           alembic upgrade head
-      - name: Run Backend Tests
+      - name: Run Backend Tests (SQLite)
         run: |
           cd services/api
+          python -m pytest -v
+      - name: Verify PostgreSQL Migrations and Full Test Suite
+        env:
+          DATABASE_URL: postgresql://civictrace_user:civictrace_secure_password@localhost:5432/civictrace_test
+        run: |
+          cd services/api
+          alembic upgrade head
           python -m pytest -v
 
   frontend-build:
