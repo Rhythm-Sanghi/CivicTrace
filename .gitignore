@@ -59,12 +59,18 @@ services/api/storage/*.json
 !storage/exports/.gitkeep
 !services/api/storage/**/.gitkeep
 
-# Environment & Secrets
+# Environment, Keys & Secrets
 .env
 .env.local
 .env.*.local
 *.pem
 *.key
+*.hex
+*.enc
+*.tar.gz
+keys/
+storage/keys/
+services/api/storage/keys/
 
 # IDE & OS
 .vscode/

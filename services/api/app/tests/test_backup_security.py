@@ -18,6 +18,7 @@ from scripts.backup_restore import (  # noqa: E402
     create_encrypted_key_backup,
     restore_encrypted_key_backup,
     compute_file_sha256,
+    _resolve_passphrase,
 )
 from app.services.crypto_signer import SignerService  # noqa: E402
 
@@ -307,3 +308,134 @@ def test_encrypted_key_backup_and_restore_cycle(tmp_path):
 
     assert (restore_dir / "signing_key.hex").read_text() == "abcd" * 16
     assert (restore_dir / "trusted_anchors_history.json").exists()
+
+
+def test_backup_fails_safely_when_committed_evidence_file_missing(tmp_path):
+    """
+    Fail-Safe Guarantee:
+    If an evidence asset is recorded in the committed database snapshot, but its physical
+    file is missing or deleted before/during backup execution, the backup MUST abort immediately.
+    It must NEVER produce an archive that appears valid but cannot restore its referenced evidence,
+    and it must remove any partially created archive.
+    """
+    db_file = str(tmp_path / "missing_file_test.db")
+    uploads_dir = tmp_path / "uploads"
+    uploads_dir.mkdir()
+
+    conn = sqlite3.connect(db_file)
+    conn.execute(
+        """
+        CREATE TABLE evidence_assets (
+            id TEXT PRIMARY KEY,
+            file_name TEXT,
+            file_path TEXT,
+            sha256_hash TEXT
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO evidence_assets VALUES (?, ?, ?, ?)",
+        ("asset-ghost-1", "ghost_photo.jpg", "ghost_photo.jpg", "a" * 64),
+    )
+    conn.commit()
+    conn.close()
+
+    backup_tar = str(tmp_path / "should_not_exist_backup.tar.gz")
+
+    with pytest.raises(RuntimeError, match="BACKUP INTEGRITY FAILURE.*missing from disk storage"):
+        create_atomic_backup(
+            output_tar=backup_tar,
+            db_path=db_file,
+            uploads_dir=str(uploads_dir),
+        )
+
+    # Fail safe: Ensure no partially written archive was left behind
+    assert not os.path.exists(backup_tar), "Partial backup archive must be removed upon failure"
+
+
+def test_backup_fails_safely_when_committed_evidence_file_modified(tmp_path):
+    """
+    Fail-Safe Guarantee:
+    If an already committed evidence file on disk has been modified or corrupted (its hash
+    no longer matches the expected sha256_hash in the database snapshot), the backup MUST
+    fail safely and refuse to create an invalid archive.
+    """
+    db_file = str(tmp_path / "modified_file_test.db")
+    uploads_dir = tmp_path / "uploads"
+    uploads_dir.mkdir()
+
+    original_bytes = b"ORIGINAL_AUTHENTIC_PHOTO_DATA"
+    expected_hash = hashlib.sha256(original_bytes).hexdigest()
+
+    # The file on disk has been tampered with or corrupted
+    tampered_bytes = b"TAMPERED_OR_CORRUPTED_PHOTO_DATA"
+    (uploads_dir / "tampered.jpg").write_bytes(tampered_bytes)
+
+    conn = sqlite3.connect(db_file)
+    conn.execute(
+        """
+        CREATE TABLE evidence_assets (
+            id TEXT PRIMARY KEY,
+            file_name TEXT,
+            file_path TEXT,
+            sha256_hash TEXT
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO evidence_assets VALUES (?, ?, ?, ?)",
+        ("asset-tampered-1", "tampered.jpg", "tampered.jpg", expected_hash),
+    )
+    conn.commit()
+    conn.close()
+
+    backup_tar = str(tmp_path / "tampered_backup.tar.gz")
+
+    with pytest.raises(RuntimeError, match="BACKUP INTEGRITY FAILURE.*content digest mismatch"):
+        create_atomic_backup(
+            output_tar=backup_tar,
+            db_path=db_file,
+            uploads_dir=str(uploads_dir),
+        )
+
+    # Fail safe: Ensure no partially written archive was left behind
+    assert not os.path.exists(backup_tar), "Partial backup archive must be removed upon failure"
+
+
+def test_encrypted_key_backup_passphrase_sources(tmp_path, monkeypatch):
+    """
+    Security Guarantee:
+    Avoids exposing passphrases in CLI arguments, process listings (ps), and shell history.
+    Verifies passphrase resolution from environment variables, secure files, and interactive prompts.
+    """
+    # 1. Resolve via --passphrase-env
+    monkeypatch.setenv("CUSTOM_PASSPHRASE_ENV", "SecretViaCustomEnv123!")
+    resolved_env = _resolve_passphrase(passphrase_env="CUSTOM_PASSPHRASE_ENV")
+    assert resolved_env == "SecretViaCustomEnv123!"
+
+    # 2. Resolve via KEY_BACKUP_PASSPHRASE fallback
+    monkeypatch.setenv("KEY_BACKUP_PASSPHRASE", "SecretViaStandardEnv456!")
+    resolved_std_env = _resolve_passphrase()
+    assert resolved_std_env == "SecretViaStandardEnv456!"
+
+    # 3. Resolve via --passphrase-file
+    monkeypatch.delenv("KEY_BACKUP_PASSPHRASE", raising=False)
+    passphrase_file = tmp_path / "secret.txt"
+    passphrase_file.write_text("SecretViaFile789!\n")
+    resolved_file = _resolve_passphrase(passphrase_file=str(passphrase_file))
+    assert resolved_file == "SecretViaFile789!"
+
+    # 4. Resolve via getpass when isatty
+    import getpass
+    monkeypatch.setattr(getpass, "getpass", lambda prompt="": "SecretFromPrompt!")
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    resolved_prompt = _resolve_passphrase()
+    assert resolved_prompt == "SecretFromPrompt!"
+
+    # 5. Error on empty / nonexistent env or file
+    with pytest.raises(ValueError, match="is not set or empty"):
+        _resolve_passphrase(passphrase_env="NONEXISTENT_VAR_xyz")
+
+    with pytest.raises(FileNotFoundError):
+        _resolve_passphrase(passphrase_file=str(tmp_path / "nonexistent.txt"))
+

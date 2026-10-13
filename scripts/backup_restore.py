@@ -63,6 +63,32 @@ def _safe_extract(tar: tarfile.TarFile, path: str):
     tar.extractall(path=dest_path)
 
 
+def _find_committed_asset_path(upload_dir: str, file_path: Optional[str], file_name: Optional[str]) -> Optional[str]:
+    """
+    Resolves the physical on-disk location of a committed evidence asset.
+    Checks candidate relative paths, absolute paths, and basename permutations.
+    """
+    candidates = []
+    if file_path:
+        norm_fp = file_path.replace("\\", "/")
+        if os.path.isabs(norm_fp) and os.path.isfile(norm_fp):
+            return norm_fp
+        candidates.append(os.path.join(upload_dir, os.path.basename(norm_fp)))
+        candidates.append(os.path.join(upload_dir, norm_fp.lstrip("/")))
+        if norm_fp.startswith("uploads/"):
+            candidates.append(os.path.join(upload_dir, norm_fp[8:].lstrip("/")))
+        if norm_fp.startswith("storage/uploads/"):
+            candidates.append(os.path.join(upload_dir, norm_fp[16:].lstrip("/")))
+    if file_name:
+        candidates.append(os.path.join(upload_dir, file_name))
+        candidates.append(os.path.join(upload_dir, os.path.basename(file_name)))
+
+    for cand in candidates:
+        if os.path.isfile(cand):
+            return os.path.abspath(cand)
+    return None
+
+
 def create_atomic_backup(
     output_tar: str,
     db_path: Optional[str] = None,
@@ -77,6 +103,7 @@ def create_atomic_backup(
     or temporary upload fragments (.tmp, .part) are never packaged.
     Signs the manifest with Ed25519 to protect against malicious archive replacement.
     STRICTLY EXCLUDES private signing keys and credentials.
+    Fails safely if any committed evidence asset is missing or has been modified.
     """
     if keys_dir:
         print("[!] SECURITY WARNING: Private key directory argument was provided to application backup. "
@@ -91,6 +118,7 @@ def create_atomic_backup(
 
     print(f"[*] Initiating atomic SQLite snapshot of database: {db_file}")
     temp_snapshot_db = output_tar + ".snapshot.db"
+    temp_manifest = output_tar + ".manifest.json"
 
     # 1. Atomic database snapshot via SQLite Online Backup API
     src_conn = sqlite3.connect(db_file)
@@ -101,52 +129,92 @@ def create_atomic_backup(
 
     try:
         # 2. Inspect snapshot database for committed evidence assets to prevent race conditions
-        committed_assets: Dict[str, Dict[str, Any]] = {}
+        committed_asset_records: list[Dict[str, Any]] = []
         snap_conn = None
         try:
             snap_conn = sqlite3.connect(temp_snapshot_db)
             snap_cur = snap_conn.cursor()
-            snap_cur.execute("SELECT id, file_name, file_path, file_hash FROM evidence_assets")
-            for row in snap_cur.fetchall():
-                asset_id, file_name, file_rel_path, expected_hash = row
-                # Normalize key to basename or relative path
-                if file_rel_path:
-                    norm_path = file_rel_path.replace("\\", "/").lstrip("/")
-                    committed_assets[norm_path] = {
-                        "asset_id": asset_id,
+            table_check = snap_cur.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='evidence_assets'"
+            ).fetchone()
+            if table_check:
+                col_rows = snap_cur.execute("PRAGMA table_info(evidence_assets)").fetchall()
+                col_names = [r[1] for r in col_rows]
+                hash_col = "sha256_hash" if "sha256_hash" in col_names else ("file_hash" if "file_hash" in col_names else None)
+                query = f"SELECT id, file_name, file_path{f', {hash_col}' if hash_col else ''} FROM evidence_assets"
+                snap_cur.execute(query)
+                for row in snap_cur.fetchall():
+                    asset_id = row[0]
+                    file_name = row[1]
+                    file_rel_path = row[2]
+                    expected_hash = row[3] if hash_col else None
+                    committed_asset_records.append({
+                        "id": asset_id,
                         "file_name": file_name,
+                        "file_path": file_rel_path,
                         "expected_hash": expected_hash,
-                    }
-                elif file_name:
-                    committed_assets[file_name] = {
-                        "asset_id": asset_id,
-                        "file_name": file_name,
-                        "expected_hash": expected_hash,
-                    }
+                    })
         except Exception as e:
             print(f"[!] Note: Could not query evidence_assets from snapshot ({e}); falling back to verified file scan.")
         finally:
             if snap_conn:
                 snap_conn.close()
 
-        # 3. Collect evidence assets matching committed state
+        # 3. Collect and verify evidence assets matching committed state
         files_manifest: Dict[str, Dict[str, Any]] = {}
         files_to_pack: list[Tuple[str, str]] = []
 
-        if os.path.exists(upload_path):
+        if committed_asset_records:
+            # Safe fail: When committed assets exist in snapshot, every one must exist on disk and match digest
+            for rec in committed_asset_records:
+                asset_id = rec["id"]
+                file_name = rec["file_name"]
+                file_rel_path = rec["file_path"]
+                expected_hash = rec["expected_hash"]
+
+                fpath = _find_committed_asset_path(upload_path, file_rel_path, file_name)
+                if not fpath or not os.path.exists(fpath):
+                    identifier = file_name or file_rel_path or asset_id
+                    raise RuntimeError(
+                        f"BACKUP INTEGRITY FAILURE: Committed evidence asset '{identifier}' (ID: {asset_id}) "
+                        f"is missing from disk storage. Cannot produce a valid recoverable backup."
+                    )
+
+                try:
+                    file_hash = compute_file_sha256(fpath)
+                    file_size = os.path.getsize(fpath)
+                except (FileNotFoundError, PermissionError) as e:
+                    raise RuntimeError(
+                        f"BACKUP INTEGRITY FAILURE: Committed evidence asset '{fpath}' could not be read: {e}. "
+                        f"Cannot produce a valid recoverable backup."
+                    )
+
+                if expected_hash and file_hash != expected_hash:
+                    identifier = file_name or file_rel_path or asset_id
+                    raise RuntimeError(
+                        f"BACKUP INTEGRITY FAILURE: Committed evidence asset '{identifier}' (ID: {asset_id}) "
+                        f"content digest mismatch! Expected {expected_hash}, got {file_hash}. "
+                        f"File was modified or corrupted during backup execution."
+                    )
+
+                try:
+                    relpath = os.path.relpath(fpath, upload_path).replace("\\", "/")
+                except ValueError:
+                    relpath = os.path.basename(fpath)
+
+                files_manifest[relpath] = {
+                    "sha256": file_hash,
+                    "size_bytes": file_size,
+                }
+                files_to_pack.append((fpath, f"uploads/{relpath}"))
+        elif os.path.exists(upload_path):
+            # Fallback when database has no evidence_assets table or zero committed records
             for root, _, files in os.walk(upload_path):
                 for file in files:
-                    # Ignore temporary/in-progress upload fragments
                     if file == ".gitkeep" or file.endswith(".tmp") or file.endswith(".part"):
                         continue
                     fpath = os.path.join(root, file)
                     relpath = os.path.relpath(fpath, upload_path).replace("\\", "/")
-
-                    # If committed assets are known, only include committed files
-                    if committed_assets and relpath not in committed_assets and file not in committed_assets:
-                        # Uncommitted or in-flight upload: skip to ensure consistent point-in-time recovery
-                        continue
-
                     try:
                         file_hash = compute_file_sha256(fpath)
                         file_size = os.path.getsize(fpath)
@@ -156,7 +224,6 @@ def create_atomic_backup(
                         }
                         files_to_pack.append((fpath, f"uploads/{relpath}"))
                     except (FileNotFoundError, PermissionError):
-                        # Concurrent deletion during backup: skip cleanly
                         continue
 
         # 4. Construct cryptographic manifest
@@ -185,7 +252,6 @@ def create_atomic_backup(
             manifest_body["signature"] = None
             manifest_body["signer_public_key"] = None
 
-        temp_manifest = output_tar + ".manifest.json"
         with open(temp_manifest, "w", encoding="utf-8") as f:
             json.dump(manifest_body, f, indent=2)
 
@@ -203,9 +269,22 @@ def create_atomic_backup(
                 os.remove(temp_manifest)
             except Exception:
                 pass
+    except Exception:
+        # Fail safe: Clean up partial archive so no corrupted/incomplete backup is left behind
+        if os.path.exists(output_tar):
+            try:
+                os.remove(output_tar)
+            except OSError:
+                pass
+        raise
     finally:
         import gc
         gc.collect()
+        if os.path.exists(temp_manifest):
+            try:
+                os.remove(temp_manifest)
+            except Exception:
+                pass
         if os.path.exists(temp_snapshot_db):
             try:
                 os.remove(temp_snapshot_db)
@@ -213,6 +292,7 @@ def create_atomic_backup(
                 pass
 
     print(f"[OK] Atomic backup archive created: {output_tar} ({os.path.getsize(output_tar)} bytes)")
+    return output_tar
     return output_tar
 
 
@@ -540,6 +620,64 @@ def rotate_signing_key(key_file: str) -> Tuple[str, str]:
     return priv_hex, pub_b64
 
 
+def _resolve_passphrase(
+    passphrase: Optional[str] = None,
+    passphrase_env: Optional[str] = None,
+    passphrase_file: Optional[str] = None,
+    prompt_text: str = "Enter key backup passphrase: ",
+) -> str:
+    """
+    Safely resolves the passphrase for key backup and restoration operations.
+    Avoids exposing passphrases through command-line arguments, process listings (ps),
+    or shell history.
+
+    Resolution Priority:
+    1. --passphrase-env: Environment variable specified on CLI
+    2. KEY_BACKUP_PASSPHRASE: Standard environment variable fallback
+    3. --passphrase-file: Secure local file containing passphrase
+    4. --passphrase: CLI argument (supported with security warning)
+    5. Interactive hidden prompt via getpass.getpass()
+    """
+    if passphrase_env:
+        val = os.environ.get(passphrase_env)
+        if not val:
+            raise ValueError(f"Passphrase environment variable '{passphrase_env}' is not set or empty.")
+        return val
+
+    if passphrase_file:
+        if not os.path.exists(passphrase_file):
+            raise FileNotFoundError(f"Passphrase file '{passphrase_file}' does not exist.")
+        with open(passphrase_file, "r", encoding="utf-8") as f:
+            val = f.read().strip("\r\n")
+        if not val:
+            raise ValueError(f"Passphrase file '{passphrase_file}' is empty.")
+        return val
+
+    env_default = os.environ.get("KEY_BACKUP_PASSPHRASE")
+    if env_default and not passphrase:
+        return env_default
+
+    if passphrase:
+        print(
+            "[!] SECURITY WARNING: Passing passphrases via CLI argument '--passphrase' exposes secrets "
+            "to process listings (ps) and shell history. Prefer '--passphrase-env', '--passphrase-file', "
+            "or interactive prompt."
+        )
+        return passphrase
+
+    if sys.stdin and sys.stdin.isatty():
+        import getpass
+        val = getpass.getpass(prompt_text)
+        if not val:
+            raise ValueError("Passphrase entered via prompt cannot be empty.")
+        return val
+    else:
+        raise ValueError(
+            "Non-interactive environment detected without passphrase. "
+            "Please provide passphrase via --passphrase-env, KEY_BACKUP_PASSPHRASE env var, or --passphrase-file."
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(description="CivicTrace Operational Release Utility")
     subparsers = parser.add_subparsers(dest="command")
@@ -559,13 +697,17 @@ def main():
     # backup-keys
     p_bkeys = subparsers.add_parser("backup-keys", help="Create encrypted backup of signing keys")
     p_bkeys.add_argument("--out", dest="out", required=True)
-    p_bkeys.add_argument("--passphrase", dest="passphrase", required=True)
+    p_bkeys.add_argument("--passphrase", dest="passphrase", default=None, help="Passphrase for key encryption (WARNING: may leak in process list)")
+    p_bkeys.add_argument("--passphrase-env", dest="passphrase_env", default=None, help="Name of environment variable containing the passphrase")
+    p_bkeys.add_argument("--passphrase-file", dest="passphrase_file", default=None, help="Path to secure file containing the passphrase")
     p_bkeys.add_argument("--keys-dir", dest="keys_dir", default=None)
 
     # restore-keys
     p_rkeys = subparsers.add_parser("restore-keys", help="Restore encrypted signing keys with passphrase")
     p_rkeys.add_argument("--archive", dest="input_file", required=True)
-    p_rkeys.add_argument("--passphrase", dest="passphrase", required=True)
+    p_rkeys.add_argument("--passphrase", dest="passphrase", default=None, help="Passphrase for key decryption (WARNING: may leak in process list)")
+    p_rkeys.add_argument("--passphrase-env", dest="passphrase_env", default=None, help="Name of environment variable containing the passphrase")
+    p_rkeys.add_argument("--passphrase-file", dest="passphrase_file", default=None, help="Path to secure file containing the passphrase")
     p_rkeys.add_argument("--target-dir", dest="target_dir", default=None)
 
     # rotate-key
@@ -584,9 +726,21 @@ def main():
     elif args.command == "restore":
         restore_atomic_backup(args.input_tar, args.target_dir, getattr(args, "expected_public_key", None))
     elif args.command == "backup-keys":
-        create_encrypted_key_backup(args.out, args.passphrase, args.keys_dir)
+        passphrase = _resolve_passphrase(
+            passphrase=args.passphrase,
+            passphrase_env=args.passphrase_env,
+            passphrase_file=args.passphrase_file,
+            prompt_text="Enter key backup encryption passphrase: ",
+        )
+        create_encrypted_key_backup(args.out, passphrase, args.keys_dir)
     elif args.command == "restore-keys":
-        restore_encrypted_key_backup(args.input_file, args.passphrase, args.target_dir)
+        passphrase = _resolve_passphrase(
+            passphrase=args.passphrase,
+            passphrase_env=args.passphrase_env,
+            passphrase_file=args.passphrase_file,
+            prompt_text="Enter key backup decryption passphrase: ",
+        )
+        restore_encrypted_key_backup(args.input_file, passphrase, args.target_dir)
     elif args.command == "rotate-key":
         rotate_signing_key(args.keyfile)
     elif args.command == "cleanup-interrupted":

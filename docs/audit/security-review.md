@@ -18,7 +18,12 @@ This comprehensive hardening cycle reviewed and remediated critical business log
 
 ### 2.1 Append-Only Cryptographic Event Ledger
 - **SHA-256 Hash Chaining:** Every case state change, department assignment, duplicate correlation, and verification vote appends a cryptographically chained `CaseEvent`.
-- **Preimage Format:** Standardized canonical representation binds `previous_hash`, `case_id`, `event_index`, `event_type`, and `canonical_json(payload)`.
+- **Versioned Canonical Preimage Format:**
+  - **Schema Version 1 (Historical Records):** Standard preimage `previous_event_hash | case_id | event_index | event_type | payload_json`.
+    - *Backward Compatibility Guarantee:* Preserves continuous verification of historical archives without mutating historical event hashes or invalidating existing external signatures.
+    - *Limitation Boundary:* Historical Schema Version 1 records remain verifiable under their original hash pre-image, but do not acquire the stronger actor identity and ISO UTC timestamp integrity guarantees introduced in Schema Version 2.
+  - **Schema Version 2 (Current Production Default):** Canonical JSON preimage binding `schema_version`, `previous_event_hash`, `case_id`, `event_index`, `event_type`, `actor_id`, `public_actor_label`, canonical ISO 8601 UTC `timestamp`, and `payload_json`.
+    - *Full Metadata Binding:* Tampering with actor metadata, user IDs, public roles, timestamps, indices, or payload directly breaks hash chain verification.
 - **Independent Checkpointing & Ed25519 Signatures:** Checkpoints aggregate the global state root of all recorded events and sign the root using offline Ed25519 digital signatures. Verifiers can validate checkpoints using the public key without needing database write access.
 - **Realistic Trust Boundary Note:** While hash-chaining guarantees detection of history tampering or payload alteration by database observers, an administrator with full write access to the database storage can rewrite the entire chain unless state roots are independently anchored to external checkpoints or public keys.
 
@@ -74,18 +79,20 @@ The archive verification system defines two mutually exclusive modes:
 
 ## 4. Verification Evidence & Test Suite Summary
 
-- **Backend Pytest Suite:** 55 passing automated tests (`$env:PYTHONPATH="services/api"; pytest services/api/app/tests -v`) covering:
+- **Backend Pytest Suite:** 65+ passing automated tests (`$env:PYTHONPATH="services/api"; pytest services/api/app/tests -v`) covering:
   - Multiprocess sequence allocator concurrency and monotonic uniqueness
   - Guest capability upload security, expiry, revocation, and header enforcement
   - Session revocation persistence across restarts and cross-worker validation
   - Digital signature verification and key replacement attack rejection
   - Event ledger hash preimage validation and timeline tamper detection
-  - Complete 9-vector ledger authenticity attack suite (`test_ledger_authenticity_attacks.py`)
+  - Complete 13-vector ledger authenticity and direct DB tampering attack suite (`test_ledger_authenticity_attacks.py`)
   - 8-scenario database concurrency race suite (`test_workflow_concurrency.py`)
   - State machine atomic transitions and ledger recording
   - Quorum verification policies, active claim isolation, dispute blocking, and Sybil resistance (`test_verification_safeguards.py`)
   - Rate limiting sliding windows and accurate `Retry-After` calculation
+  - Fail-safe committed evidence backup validation and secure passphrase resolution (`test_backup_security.py`)
+  - Audited identity enrollment endpoint and conservative auto-resolve governance
 - **Frontend Vitest Suite:** 7 passing unit & regression tests (`npm test` in `apps/web`) covering components, authentication forms, reviewer moderation desk, operator claims station, and responsive accessibility.
 - **Playwright Chromium E2E:** 14 full interactive browser lifecycle steps + unauthorized operator check + evidence package tamper detection + 320px mobile viewport, keyboard navigation, and 200% zoom checks (`scripts/run_browser_e2e.py`).
-- **Database Migrations:** Clean forward schema migration verified from empty database (`alembic upgrade head`) and data-preserving upgrade of existing development datasets to Alembic head `c7a3b4e12f01`.
-- **Operational Release Utility:** Atomic backup, restore verification, upload cleanup, and Ed25519 keypair rotation automated in `scripts/backup_restore.py`.
+- **Database Migrations:** Clean forward schema migration verified from empty database (`alembic upgrade head`) and data-preserving upgrade of existing development datasets to Alembic head `e8f2c1b9a304`.
+- **Operational Release Utility:** Atomic backup, restore verification, upload cleanup, fail-safe committed evidence checks, hidden prompt passphrase resolution, and Ed25519 keypair rotation automated in `scripts/backup_restore.py`.

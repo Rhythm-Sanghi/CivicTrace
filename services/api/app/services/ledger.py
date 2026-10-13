@@ -10,6 +10,31 @@ GENESIS_PREVIOUS_HASH = "0" * 64
 
 
 class LedgerService:
+    """
+    Cryptographic append-only ledger service for CivicTrace case audit trails.
+
+    Integrity Schema Policy:
+    - Schema Version 1 (Historical): Standard hash preimage:
+        hash = SHA-256(previous_event_hash | case_id | event_index | event_type | payload_json)
+      Legacy Guarantee: Preserves backward compatibility and mathematical verifiability for all
+      historical records without mutating past hashes or invalidating existing external signatures.
+      Limitation: Schema-v1 records do NOT acquire the stronger actor identity and ISO timestamp
+      integrity guarantees introduced in Schema Version 2.
+    - Schema Version 2 (Current Default): Enhanced canonical JSON preimage:
+        hash = SHA-256(canonical_json({
+          schema_version: 2,
+          previous_event_hash,
+          case_id,
+          event_index,
+          event_type,
+          actor_id,
+          public_actor_label,
+          timestamp (canonical ISO 8601 UTC),
+          payload_json
+        }))
+      Guarantee: Full cryptographic binding across actor identity, public actor label, exact UTC
+      timestamp, sequence index, and event payload. Directly detects any modification to metadata.
+    """
     @staticmethod
     def canonical_iso_timestamp(dt: Union[datetime, str]) -> str:
         if isinstance(dt, str):
@@ -33,7 +58,11 @@ class LedgerService:
         payload_json: str,
     ) -> str:
         if schema_version == 1:
-            # Historical Schema Version 1 (preserves backward compatibility and verification of existing records)
+            # Historical Schema Version 1 (preserves backward compatibility and verification of existing records).
+            # Note: Legacy schema-v1 records remain verifiable under their original hash chaining pre-image,
+            # but do not acquire the stronger actor identity and ISO timestamp integrity guarantees introduced
+            # by schema v2. Historical events retain their immutable v1 pre-image to avoid historical signature
+            # invalidation and retroactive ledger rewriting.
             hash_preimage = f"{previous_event_hash}|{case_id}|{event_index}|{event_type}|{payload_json}"
             return hashlib.sha256(hash_preimage.encode("utf-8")).hexdigest()
         elif schema_version == 2:
