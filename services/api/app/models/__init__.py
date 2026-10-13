@@ -19,6 +19,8 @@ from app.models.entities import (
     PriorityBand,
     RecurrenceRelationship,
     IntegrityCheckpoint,
+    RevokedToken,
+    SequenceCounter,
 )
 
 __all__ = [
@@ -42,4 +44,6 @@ __all__ = [
     "PriorityBand",
     "RecurrenceRelationship",
     "IntegrityCheckpoint",
+    "RevokedToken",
+    "SequenceCounter",
 ]

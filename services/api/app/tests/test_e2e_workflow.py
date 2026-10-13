@@ -14,12 +14,14 @@ TEST_DB_URL = "sqlite:///./test_e2e_civictrace.db"
 e2e_engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
 TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=e2e_engine)
 
+
 @pytest.fixture(scope="module")
 def setup_db():
     Base.metadata.drop_all(bind=e2e_engine)
     Base.metadata.create_all(bind=e2e_engine)
     yield
     Base.metadata.drop_all(bind=e2e_engine)
+
 
 @pytest.fixture
 def session(setup_db):
@@ -29,6 +31,7 @@ def session(setup_db):
     finally:
         db.close()
 
+
 @pytest.fixture
 def client(session):
     def override_get_db():
@@ -36,10 +39,12 @@ def client(session):
             yield session
         finally:
             pass
+
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
 
 def test_full_civic_accountability_lifecycle_e2e(client, session):
     # 1. Setup seed category & roles
@@ -84,7 +89,9 @@ def test_full_civic_accountability_lifecycle_e2e(client, session):
         "address_reference": "MG Road near Rajwada",
         "guest_pseudonym": "Concerned Resident",
     }
-    r1 = client.post("/api/v1/reports", json=rpt_payload, headers={"Authorization": f"Bearer {token_citizen}"})
+    r1 = client.post(
+        "/api/v1/reports", json=rpt_payload, headers={"Authorization": f"Bearer {token_citizen}"}
+    )
     assert r1.status_code == 201
     created_report = r1.json()
     case_id = created_report["case_id"]

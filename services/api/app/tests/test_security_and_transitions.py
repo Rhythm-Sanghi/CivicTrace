@@ -7,6 +7,7 @@ from app.core.rate_limiter import check_rate_limit, reset_rate_limits
 from app.services.state_machine import CaseStateMachine, CaseState
 from fastapi import HTTPException
 
+
 def test_magic_bytes_detection():
     # Valid JPEG
     valid_jpg = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00"
@@ -23,6 +24,7 @@ def test_magic_bytes_detection():
     valid_pdf = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"
     assert validate_magic_bytes(valid_pdf, "application/pdf") is True
     assert validate_magic_bytes(b"<!DOCTYPE html>", "application/pdf") is False
+
 
 def test_collision_resistant_monotonic_sequence_allocators(db_session):
     cat = IssueCategory(name="Seq Cat", code="SEQ01", default_severity_weight=1.0)
@@ -49,9 +51,15 @@ def test_collision_resistant_monotonic_sequence_allocators(db_session):
     num2 = int(id2.split("-")[-1])
     assert num2 > num1
 
+
 def test_atomic_state_machine_transition_with_ledger(db_session):
     cat = IssueCategory(name="SM Cat", code="SM01", default_severity_weight=2.0)
-    reviewer = User(email="rev_sm@civictrace.local", hashed_password="p", display_name="Rev SM", role=UserRole.REVIEWER)
+    reviewer = User(
+        email="rev_sm@civictrace.local",
+        hashed_password="p",
+        display_name="Rev SM",
+        role=UserRole.REVIEWER,
+    )
     case = Case(
         public_id="TEST-SM-001",
         category=cat,
@@ -79,10 +87,13 @@ def test_atomic_state_machine_transition_with_ledger(db_session):
     assert case.events[0].event_type == "STATE_CHANGED_TO_VERIFIED"
     assert case.events[0].public_actor_label == "Community Reviewer"
 
+
 def test_rate_limiter_enforcement():
     reset_rate_limits()
+
     class DummyClient:
         host = "192.168.1.100"
+
     class DummyRequest:
         client = DummyClient()
 
@@ -105,9 +116,24 @@ def test_unapproved_evidence_download_protection(client, db_session):
     from app.core.config import settings
 
     cat = IssueCategory(name="Evidence Test Cat", code="ETC01", default_severity_weight=1.5)
-    cit_owner = User(email="owner@civictrace.local", hashed_password="p", display_name="Owner Citizen", role=UserRole.CITIZEN)
-    cit_other = User(email="other@civictrace.local", hashed_password="p", display_name="Other Citizen", role=UserRole.CITIZEN)
-    reviewer = User(email="rev_evid@civictrace.local", hashed_password="p", display_name="Reviewer Evid", role=UserRole.REVIEWER)
+    cit_owner = User(
+        email="owner@civictrace.local",
+        hashed_password="p",
+        display_name="Owner Citizen",
+        role=UserRole.CITIZEN,
+    )
+    cit_other = User(
+        email="other@civictrace.local",
+        hashed_password="p",
+        display_name="Other Citizen",
+        role=UserRole.CITIZEN,
+    )
+    reviewer = User(
+        email="rev_evid@civictrace.local",
+        hashed_password="p",
+        display_name="Reviewer Evid",
+        role=UserRole.REVIEWER,
+    )
     db_session.add_all([cat, cit_owner, cit_other, reviewer])
     db_session.commit()
 
@@ -274,7 +300,12 @@ def test_login_never_leaks_token_via_accept_headers(client, db_session):
     db_session.commit()
 
     # Even with diverse or wildcard Accept headers, token is NEVER returned without explicit param
-    for accept_header in ["*/*", "text/html", "application/json", "application/x-www-form-urlencoded"]:
+    for accept_header in [
+        "*/*",
+        "text/html",
+        "application/json",
+        "application/x-www-form-urlencoded",
+    ]:
         resp = client.post(
             "/api/v1/auth/login",
             data={"username": user.email, "password": "NoLeakPass2026!"},
@@ -377,7 +408,6 @@ def test_cli_bearer_token_login_and_csrf_bypass(client, db_session):
     assert me_resp.status_code == 401
 
 
-
 def test_deterministic_rate_limiter_without_sleep():
     reset_rate_limits()
 
@@ -393,16 +423,26 @@ def test_deterministic_rate_limiter_without_sleep():
 
     # 3 requests at base_time should pass with max=3, window=60
     for _ in range(3):
-        check_rate_limit(req, max_requests=3, window_seconds=60, action_key="fast_test", current_time=base_time)
+        check_rate_limit(
+            req, max_requests=3, window_seconds=60, action_key="fast_test", current_time=base_time
+        )
 
     # 4th request at same timestamp must be blocked with 429
     with pytest.raises(HTTPException) as exc:
-        check_rate_limit(req, max_requests=3, window_seconds=60, action_key="fast_test", current_time=base_time)
+        check_rate_limit(
+            req, max_requests=3, window_seconds=60, action_key="fast_test", current_time=base_time
+        )
     assert exc.value.status_code == 429
     assert "Retry-After" in exc.value.headers
 
     # Advance time past the 60-second window (base_time + 61s): request must now succeed deterministically!
-    check_rate_limit(req, max_requests=3, window_seconds=60, action_key="fast_test", current_time=base_time + 61.0)
+    check_rate_limit(
+        req,
+        max_requests=3,
+        window_seconds=60,
+        action_key="fast_test",
+        current_time=base_time + 61.0,
+    )
 
 
 def test_reverse_proxy_ip_trust_guard():

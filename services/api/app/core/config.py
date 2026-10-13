@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 import json
 import os
 
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "CivicTrace"
     ENVIRONMENT: str = "development"
@@ -12,7 +13,7 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str = "civictrace-insecure-development-secret-change-in-production-2026"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 # 24 hours
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
     # SQLite default for local zero-dependency development; PostgreSQL+PostGIS in production
     DATABASE_URL: str = "sqlite:///./civictrace_dev.db"
@@ -20,7 +21,7 @@ class Settings(BaseSettings):
     STORAGE_DIR: str = "./storage"
     UPLOAD_DIR: str = "./storage/uploads"
     EXPORT_DIR: str = "./storage/exports"
-    MAX_UPLOAD_SIZE_BYTES: int = 10 * 1024 * 1024 # 10MB
+    MAX_UPLOAD_SIZE_BYTES: int = 10 * 1024 * 1024  # 10MB
 
     CORS_ORIGINS: Union[List[str], str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
@@ -32,8 +33,18 @@ class Settings(BaseSettings):
     AUTO_CREATE_TABLES: bool = False
 
     # Resolution Verification Policy Constants
-    # Minimum required confirmations from distinct identities to automatically resolve an uncontested claim
+    # Minimum required confirmations from distinct identities to automatically resolve an uncontested claim in demo mode
     CONFIRMATIONS_REQUIRED_FOR_AUTO_RESOLVE: int = 2
+
+    # Identity Assurance Governance: When True, ordinary self-registered citizen accounts alone cannot auto-close cases;
+    # formal closure strictly requires an authorized Reviewer / Administrator sign-off or trusted citizen identity.
+    REQUIRE_TRUSTED_IDENTITY_FOR_AUTO_RESOLVE: bool = False
+
+    # Moderation Policy: When True, untrusted (guest/citizen) reports start as PENDING and require reviewer approval
+    REQUIRE_REPORT_MODERATION: bool = False
+
+    # Guest upload capability token lifetime (in minutes)
+    GUEST_UPLOAD_TOKEN_EXPIRE_MINUTES: int = 120
 
     # Rate Limiting & Proxy Configuration
     BEHIND_PROXY: bool = False
@@ -55,20 +66,26 @@ class Settings(BaseSettings):
         return v
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="ignore"
     )
+
 
 settings = Settings()
 
 # Production Security Gate: Fail safely if insecure default secret is used in production
 if settings.ENVIRONMENT.lower() == "production":
     if settings.SECRET_KEY == "civictrace-insecure-development-secret-change-in-production-2026":
-        raise RuntimeError("FATAL: Cannot start CivicTrace in production with default insecure SECRET_KEY.")
+        raise RuntimeError(
+            "FATAL: Cannot start CivicTrace in production with default insecure SECRET_KEY."
+        )
     if settings.AUTO_CREATE_TABLES:
-        raise RuntimeError("FATAL: AUTO_CREATE_TABLES must be False in production. Use Alembic migrations instead.")
+        raise RuntimeError(
+            "FATAL: AUTO_CREATE_TABLES must be False in production. Use Alembic migrations instead."
+        )
+    # In production, report moderation must always fail safe and be active
+    settings.REQUIRE_REPORT_MODERATION = True
+    # In production, self-registered ordinary accounts alone cannot trigger automatic case closure
+    settings.REQUIRE_TRUSTED_IDENTITY_FOR_AUTO_RESOLVE = True
 
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 os.makedirs(settings.EXPORT_DIR, exist_ok=True)

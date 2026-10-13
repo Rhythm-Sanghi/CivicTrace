@@ -3,6 +3,7 @@ from typing import Tuple
 from app.models.entities import PriorityBand
 from app.core.security import canonical_json
 
+
 class PriorityEngine:
     """
     Explainable Civic Priority Scoring Engine.
@@ -59,7 +60,9 @@ class PriorityEngine:
 
         reasons = []
         if base_score >= 3.0:
-            reasons.append("High intrinsic hazard category (e.g. exposed electrical or major road collapse)")
+            reasons.append(
+                "High intrinsic hazard category (e.g. exposed electrical or major road collapse)"
+            )
         elif base_score >= 2.0:
             reasons.append("Moderate civic safety category")
         else:
@@ -88,3 +91,65 @@ class PriorityEngine:
         }
 
         return final_score, band, canonical_json(breakdown)
+
+    @classmethod
+    def recalculate_open_case_priorities(cls, db) -> int:
+        """
+        Recalculates dynamic priority scores for all open cases to reflect
+        time elapsed, corroboration updates, and recurrence status.
+        """
+        from app.models.entities import (
+            Case,
+            CaseState,
+            Report,
+            ReportModerationStatus,
+            RecurrenceRelationship,
+        )
+
+        open_states = [
+            CaseState.SUBMITTED,
+            CaseState.UNDER_REVIEW,
+            CaseState.VERIFIED,
+            CaseState.ASSIGNED,
+            CaseState.IN_PROGRESS,
+            CaseState.REOPENED,
+            CaseState.DISPUTED,
+            CaseState.AWAITING_VERIFICATION,
+        ]
+        open_cases = db.query(Case).filter(Case.state.in_(open_states)).all()
+        updated_count = 0
+        for case in open_cases:
+            report_count = (
+                db.query(Report)
+                .filter(
+                    Report.case_id == case.id,
+                    Report.moderation_status == ReportModerationStatus.APPROVED,
+                )
+                .count()
+            )
+            if report_count == 0:
+                report_count = 1
+
+            is_recurring = (
+                db.query(RecurrenceRelationship)
+                .filter(RecurrenceRelationship.current_case_id == case.id)
+                .first()
+                is not None
+            )
+
+            cat_weight = case.category.default_severity_weight if case.category else 2.0
+            new_score, new_band, new_breakdown = cls.calculate_priority(
+                category_weight=cat_weight,
+                report_count=report_count,
+                created_at=case.created_at,
+                is_recurring=is_recurring,
+            )
+            if new_score != case.priority_score or new_band != case.priority_band:
+                case.priority_score = new_score
+                case.priority_band = new_band
+                case.priority_breakdown = new_breakdown
+                updated_count += 1
+
+        if updated_count > 0:
+            db.commit()
+        return updated_count

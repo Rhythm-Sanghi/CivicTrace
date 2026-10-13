@@ -31,6 +31,7 @@ app.add_middleware(
 # Mount API Router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+
 @app.get("/health", tags=["Health"])
 def health_check():
     return {

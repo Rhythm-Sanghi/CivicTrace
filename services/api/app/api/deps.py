@@ -10,7 +10,10 @@ import hmac
 from app.core.security import is_token_revoked
 from app.models.entities import User, UserRole
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login", auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_PREFIX}/auth/login", auto_error=False
+)
+
 
 def _validate_csrf_if_cookie_auth(request: Request, is_cookie_auth: bool) -> None:
     """Enforces Double-Submit Cookie CSRF protection and Origin verification for cookie-authenticated mutating requests."""
@@ -29,7 +32,11 @@ def _validate_csrf_if_cookie_auth(request: Request, is_cookie_auth: bool) -> Non
     # 1. Origin / Referer validation against trusted hosts and CORS origins
     origin = request.headers.get("origin")
     referer = request.headers.get("referer")
-    allowed_origins = set(settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS])
+    allowed_origins = set(
+        settings.CORS_ORIGINS
+        if isinstance(settings.CORS_ORIGINS, list)
+        else [settings.CORS_ORIGINS]
+    )
 
     # Also dynamically allow the server's own request host origin
     host_header = request.headers.get("host")
@@ -43,7 +50,7 @@ def _validate_csrf_if_cookie_auth(request: Request, is_cookie_auth: bool) -> Non
         if origin not in allowed_origins and "*" not in allowed_origins:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"CSRF verification failed: untrusted origin '{origin}'"
+                detail=f"CSRF verification failed: untrusted origin '{origin}'",
             )
     elif referer:
         # Parse referer URL to match origin scheme://netloc
@@ -52,7 +59,7 @@ def _validate_csrf_if_cookie_auth(request: Request, is_cookie_auth: bool) -> Non
         if ref_origin not in allowed_origins and "*" not in allowed_origins:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"CSRF verification failed: untrusted referer '{ref_origin}'"
+                detail=f"CSRF verification failed: untrusted referer '{ref_origin}'",
             )
 
     # 2. Double-Submit Token verification
@@ -62,19 +69,17 @@ def _validate_csrf_if_cookie_auth(request: Request, is_cookie_auth: bool) -> Non
     if not csrf_cookie or not csrf_header:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="CSRF verification failed: missing CSRF token"
+            detail="CSRF verification failed: missing CSRF token",
         )
 
     if not hmac.compare_digest(csrf_cookie, csrf_header):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="CSRF verification failed: token mismatch"
+            status_code=status.HTTP_403_FORBIDDEN, detail="CSRF verification failed: token mismatch"
         )
 
+
 def get_current_user_optional(
-    request: Request,
-    token: Optional[str] = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    request: Request, token: Optional[str] = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> Optional[User]:
     is_cookie_auth = False
     # Check Authorization Bearer header first; fallback to HttpOnly session cookie
@@ -87,7 +92,7 @@ def get_current_user_optional(
         return None
 
     # Check session revocation blocklist
-    if is_token_revoked(token):
+    if is_token_revoked(token, db_session=db):
         return None
 
     try:
@@ -104,9 +109,8 @@ def get_current_user_optional(
     user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
     return user
 
-def get_current_user(
-    user: Optional[User] = Depends(get_current_user_optional)
-) -> User:
+
+def get_current_user(user: Optional[User] = Depends(get_current_user_optional)) -> User:
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -115,12 +119,14 @@ def get_current_user(
         )
     return user
 
+
 def require_roles(*allowed_roles: UserRole):
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access forbidden: role {current_user.role.value} does not have required permissions"
+                detail=f"Access forbidden: role {current_user.role.value} does not have required permissions",
             )
         return current_user
+
     return role_checker

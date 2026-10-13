@@ -1,10 +1,12 @@
 import hashlib
 from typing import Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session
-from app.models.entities import Case, CaseEvent, User
+from app.models.entities import Case, CaseEvent, User, IntegrityCheckpoint
 from app.core.security import canonical_json
+from app.services.crypto_signer import SignerService
 
 GENESIS_PREVIOUS_HASH = "0" * 64
+
 
 class LedgerService:
     @staticmethod
@@ -21,15 +23,17 @@ class LedgerService:
         Computes SHA-256 hash chaining:
         current_event_hash = SHA256(previous_event_hash + canonical_json(event_metadata_and_payload))
         """
-        # Find latest event for this case
+        from app.core.sequences import allocate_case_event_index
+
+        next_index = allocate_case_event_index(db, case.id)
+
+        # Find latest event for this case to link previous hash
         last_event = (
             db.query(CaseEvent)
             .filter(CaseEvent.case_id == case.id)
             .order_by(CaseEvent.event_index.desc())
             .first()
         )
-
-        next_index = 1 if not last_event else last_event.event_index + 1
         previous_hash = GENESIS_PREVIOUS_HASH if not last_event else last_event.current_event_hash
 
         if not public_actor_label:
@@ -117,3 +121,58 @@ class LedgerService:
             expected_previous_hash = event.current_event_hash
 
         return True, len(events), None, expected_previous_hash
+
+    @staticmethod
+    def create_checkpoint(db: Session) -> IntegrityCheckpoint:
+        """
+        Creates an independently verifiable cryptographic checkpoint for all recorded events.
+        Roots all events across the database, signs the state root with Ed25519, and stores
+        the checkpoint.
+        """
+        total_events = db.query(CaseEvent).count()
+        last_event = db.query(CaseEvent).order_by(CaseEvent.id.desc()).first()
+        latest_event_hash = last_event.current_event_hash if last_event else GENESIS_PREVIOUS_HASH
+
+        last_checkpoint = (
+            db.query(IntegrityCheckpoint)
+            .order_by(IntegrityCheckpoint.checkpoint_index.desc())
+            .first()
+        )
+        next_checkpoint_index = 1 if not last_checkpoint else last_checkpoint.checkpoint_index + 1
+
+        checkpoint_data = {
+            "checkpoint_index": next_checkpoint_index,
+            "total_events": total_events,
+            "latest_event_hash": latest_event_hash,
+        }
+        canonical_checkpoint = canonical_json(checkpoint_data).encode("utf-8")
+        root_hash = hashlib.sha256(canonical_checkpoint).hexdigest()
+
+        # Digital signature via Ed25519
+        sig_b64 = SignerService.sign_bytes(root_hash.encode("utf-8"))
+        pub_key_b64 = SignerService.get_public_key_base64()
+
+        checkpoint = IntegrityCheckpoint(
+            checkpoint_index=next_checkpoint_index,
+            total_events_covered=total_events,
+            root_hash=root_hash,
+            signature=sig_b64,
+            signer_public_key=pub_key_b64,
+            signature_algorithm="Ed25519",
+        )
+        db.add(checkpoint)
+        db.flush()
+        return checkpoint
+
+    @staticmethod
+    def verify_checkpoint(checkpoint: IntegrityCheckpoint) -> bool:
+        """
+        Verifies the Ed25519 digital signature of an integrity checkpoint.
+        """
+        if not checkpoint.signature or not checkpoint.signer_public_key:
+            return False
+        return SignerService.verify_signature(
+            data=checkpoint.root_hash.encode("utf-8"),
+            signature_b64=checkpoint.signature,
+            public_key_b64=checkpoint.signer_public_key,
+        )

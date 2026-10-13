@@ -43,7 +43,8 @@ def get_client_ip(request: Request) -> str:
 def _cleanup_expired_keys(now: float) -> None:
     """Internal helper to prune keys with no active timestamps."""
     expired_keys = [
-        k for k, timestamps in _request_records.items()
+        k
+        for k, timestamps in _request_records.items()
         if not timestamps or timestamps[-1] < (now - 300)
     ]
     for k in expired_keys:
@@ -78,7 +79,10 @@ def check_rate_limit(
         valid_timestamps = [t for t in timestamps if t > cutoff]
 
         if len(valid_timestamps) >= max_requests:
-            retry_after = max(1, int(cutoff + window_seconds - valid_timestamps[0]))
+            # Earliest request within window expires at valid_timestamps[0] + window_seconds
+            # Remaining wait time until a request slot becomes available:
+            remaining_cooldown = (valid_timestamps[0] + window_seconds) - now
+            retry_after = max(1, int(remaining_cooldown) + 1)
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Rate limit exceeded. Maximum {max_requests} requests per {window_seconds}s.",

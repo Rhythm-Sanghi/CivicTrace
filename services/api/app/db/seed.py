@@ -18,10 +18,18 @@ from app.models.entities import (
 )
 from app.services.ledger import LedgerService
 from app.services.priority_engine import PriorityEngine
+from app.core.config import settings
 
-def seed_database(reset: bool = False):
+
+def seed_database(reset: bool = False, allow_destructive_reset: bool = False):
     if reset:
-        Base.metadata.drop_all(bind=engine)
+        # Non-negotiable rule: Never drop tables on a production or non-test database
+        if settings.ENVIRONMENT.lower() == "production" or not allow_destructive_reset:
+            print(
+                "Notice: Destructive reset requested but prevented by safety guard. Using non-destructive schema initialization."
+            )
+        else:
+            Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
@@ -105,7 +113,9 @@ def seed_database(reset: bool = False):
             display_name="Priya Patel",
             role=UserRole.CITIZEN,
         )
-        db.add_all([admin_user, reviewer_user, operator_roads, operator_lighting, citizen_1, citizen_2])
+        db.add_all(
+            [admin_user, reviewer_user, operator_roads, operator_lighting, citizen_1, citizen_2]
+        )
         db.flush()
 
         # 4. Issue Categories
@@ -223,7 +233,10 @@ def seed_database(reset: bool = False):
             db=db,
             case=case_a,
             event_type="REPORT_LINKED",
-            payload={"report_id": rpt_a2.public_id, "reason": "Deterministic duplicate detection: 92% similarity (14m away)"},
+            payload={
+                "report_id": rpt_a2.public_id,
+                "reason": "Deterministic duplicate detection: 92% similarity (14m away)",
+            },
             actor=reviewer_user,
             public_actor_label="Community Reviewer Rajesh Sharma",
         )
@@ -231,7 +244,10 @@ def seed_database(reset: bool = False):
             db=db,
             case=case_a,
             event_type="REPORT_LINKED",
-            payload={"report_id": rpt_a3.public_id, "reason": "Corroborating observation merged: 88% similarity"},
+            payload={
+                "report_id": rpt_a3.public_id,
+                "reason": "Corroborating observation merged: 88% similarity",
+            },
             actor=reviewer_user,
             public_actor_label="Community Reviewer Rajesh Sharma",
         )
@@ -567,15 +583,22 @@ def seed_database(reset: bool = False):
             db=db,
             case=case_e,
             event_type="PRIORITY_ESCALATED",
-            payload={"score": score_e, "band": band_e.value, "reason": "High voltage hazard + multiple independent reports"},
+            payload={
+                "score": score_e,
+                "band": band_e.value,
+                "reason": "High voltage hazard + multiple independent reports",
+            },
             actor=reviewer_user,
             public_actor_label="Civic Priority Engine",
         )
 
         db.commit()
-        print("Database successfully seeded with 5 connected scenarios and realistic Indore records!")
+        print(
+            "Database successfully seeded with 5 connected scenarios and realistic Indore records!"
+        )
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     seed_database()

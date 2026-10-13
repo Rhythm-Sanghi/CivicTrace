@@ -14,12 +14,14 @@ SQLALCHEMY_DATABASE_URL = "sqlite:///./test_civictrace.db"
 test_engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
     Base.metadata.drop_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
     yield
     Base.metadata.drop_all(bind=test_engine)
+
 
 @pytest.fixture
 def db_session():
@@ -29,6 +31,7 @@ def db_session():
     finally:
         db.close()
 
+
 @pytest.fixture
 def client(db_session):
     def override_get_db():
@@ -36,20 +39,24 @@ def client(db_session):
             yield db_session
         finally:
             pass
+
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
 
 def test_health_check(client):
     res = client.get("/health")
     assert res.status_code == 200
     assert res.json()["status"] == "healthy"
 
+
 def test_haversine_formula():
     # Rajwada to Chhappan Dukan in Indore is ~2.6 km
     d = haversine_distance_meters(22.7188, 75.8562, 22.7231, 75.8812)
     assert 2400 < d < 2800
+
 
 def test_append_only_ledger_hash_chaining(db_session):
     # Create test case
@@ -67,7 +74,9 @@ def test_append_only_ledger_hash_chaining(db_session):
 
     # Append 3 events
     LedgerService.append_event(db_session, case, "REPORT_CREATED", {"detail": "Initial report"})
-    e2 = LedgerService.append_event(db_session, case, "INVESTIGATION_STARTED", {"officer": "Team A"})
+    e2 = LedgerService.append_event(
+        db_session, case, "INVESTIGATION_STARTED", {"officer": "Team A"}
+    )
     e3 = LedgerService.append_event(db_session, case, "RESOLUTION_CLAIMED", {"work": "Fixed bulb"})
     db_session.commit()
 
@@ -86,6 +95,7 @@ def test_append_only_ledger_hash_chaining(db_session):
     is_valid_after_tamper, _, tamper_err, _ = LedgerService.verify_chain(db_session, case.id)
     assert is_valid_after_tamper is False
     assert "tampering detected" in tamper_err
+
 
 def test_export_package_and_manifest_tamper_detection(db_session):
     case = Case(
@@ -111,6 +121,7 @@ def test_export_package_and_manifest_tamper_detection(db_session):
     assert is_valid is True
     assert any("SUCCESS" in l for l in logs)
 
+
 def test_priority_engine_mappings():
     from app.services.priority_engine import PriorityEngine
     from app.models.entities import PriorityBand
@@ -134,4 +145,3 @@ def test_priority_engine_mappings():
     )
     assert score_low == 1.5
     assert band_low == PriorityBand.LOW
-
