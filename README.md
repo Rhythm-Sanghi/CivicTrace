@@ -8,7 +8,7 @@ Built with a modular monolith architecture for **WarriorHacks 2.0** (Theme: Civi
 
 ---
 
-## 🏛️ The Core Difference
+## The Core Difference
 
 | Generic Complaint Portals | CivicTrace Evidence Ledger |
 | :--- | :--- |
@@ -20,7 +20,7 @@ Built with a modular monolith architecture for **WarriorHacks 2.0** (Theme: Civi
 
 ---
 
-## ⚡ Quick Start (Local Development)
+## Quick Start (Local Development)
 
 CivicTrace requires zero paid APIs, zero cloud AI subscriptions, and no mandatory Docker. It runs smoothly on any modern laptop (e.g. Windows 11 / WSL2 / macOS / Linux).
 
@@ -82,7 +82,7 @@ alembic upgrade head
 
 ---
 
-## 👥 Seeded Demonstration Accounts
+## Seeded Demonstration Accounts
 
 The database comes pre-seeded with 5 interconnected scenarios set in **Indore Central & North Ward, Madhya Pradesh, India** (illustrative municipal data):
 
@@ -97,7 +97,7 @@ The database comes pre-seeded with 5 interconnected scenarios set in **Indore Ce
 
 ---
 
-## 🧪 Running Automated Tests
+## Running Automated Tests
 
 ### Backend Unit & Safeguard Suite (Pytest)
 Run the full backend security and cryptographic ledger test suite:
@@ -150,7 +150,7 @@ python scripts/verify_evidence.py storage/exports/<package_name>.zip
 
 ---
 
-## ⚙️ Architecture & Production Operational Notes
+## Architecture & Production Operational Notes
 
 - **Database Engine Support:** SQLite is the default zero-dependency database for local development and offline testing. Production environments support PostgreSQL with PostGIS for native spatial indexes; note that PostgreSQL/PostGIS is unverified in this offline testing environment and requires running migrations (`alembic upgrade head`) against a live Postgres instance before production deployment.
 - **Rate Limiting Scope:** The built-in rate limiter utilizes an in-memory sliding window protected by thread locks and periodic memory pruning. In single-process development and standard evaluation servers, it prevents basic spam and flooding with zero external dependencies. For distributed, multi-worker (e.g. Uvicorn clusters) or multi-container horizontal deployments, replace the in-memory store with a Redis / Valkey-backed sliding-window counter.
@@ -159,7 +159,7 @@ python scripts/verify_evidence.py storage/exports/<package_name>.zip
 
 ---
 
-## 🔀 Repository Default Branch Configuration
+## Repository Default Branch Configuration
 
 The remote repository default branch is currently set to `master`. To align with standard modern conventions and make `main` the authoritative default branch on GitHub:
 
@@ -177,7 +177,7 @@ The remote repository default branch is currently set to `master`. To align with
 
 ---
 
-## 🎨 Visual Identity
+## Visual Identity
 
 CivicTrace follows the **Benchlight Design System** (Workshop + Gridline + Studio Utility):
 - **Workshop:** Purposeful density, clear tools, and honest controls.
