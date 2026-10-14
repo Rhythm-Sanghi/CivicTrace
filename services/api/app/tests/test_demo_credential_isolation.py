@@ -38,9 +38,21 @@ def test_seed_database_refuses_production_environment(db_session):
         with pytest.raises(RuntimeError, match="SECURITY ABORT"):
             seed_database()
 
-        # Simulate production database URL
+        # 3. Simulate production database URL
         settings.ENVIRONMENT = "development"
         settings.DATABASE_URL = "postgresql://user:pass@production-cluster:5432/civictrace_prod"
+        with pytest.raises(RuntimeError, match="SECURITY ABORT"):
+            seed_database()
+
+        # 4. Simulate production environment with arbitrary non-prod database name
+        settings.ENVIRONMENT = "production"
+        settings.DATABASE_URL = "postgresql://user:pass@municipal-host:5432/arbitrary_city_records"
+        with pytest.raises(RuntimeError, match="SECURITY ABORT"):
+            seed_database()
+
+        # 5. Simulate staging / live environment setting
+        settings.ENVIRONMENT = "live"
+        settings.DATABASE_URL = "postgresql://user:pass@municipal-host:5432/arbitrary_city_records"
         with pytest.raises(RuntimeError, match="SECURITY ABORT"):
             seed_database()
 

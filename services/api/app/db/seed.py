@@ -25,7 +25,9 @@ def seed_database(reset: bool = False, allow_destructive_reset: bool = False):
     # Non-negotiable security guard: Demo database seeding is strictly prohibited in production environments.
     # Refuses to seed known demonstration credentials or accounts without altering any existing user accounts.
     env = settings.ENVIRONMENT.lower()
-    if env in ("production", "prod") or "prod" in settings.DATABASE_URL.lower():
+    is_prod_env = env in ("production", "prod", "live", "staging", "stage")
+    is_prod_db = any(term in settings.DATABASE_URL.lower() for term in ("prod", "production", "live", "stage", "staging"))
+    if is_prod_env or is_prod_db:
         raise RuntimeError(
             "SECURITY ABORT: Demo database seeding is strictly prohibited in production environments. "
             "Refusing to seed known demonstration accounts or passwords into production."
