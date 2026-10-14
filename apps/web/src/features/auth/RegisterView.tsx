@@ -44,15 +44,14 @@ export const RegisterView: React.FC = () => {
   return (
     <>
       <PageHeading
-        index="00"
-        title="Citizen Registration"
-        description="Create a citizen observer account to submit corroborated observations, participate in community resolution verification, and track civic infrastructure."
+        title="Create an account"
+        description="Citizen registration · Register to submit observations, check reported repairs, and track infrastructure cases."
       />
 
       <div className="workspace">
         <div style={{ maxWidth: "480px", margin: "20px auto" }}>
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "var(--space-5)" }}>
-            <SectionHeader index="01" title="Register Citizen Identity" />
+            <SectionHeader title="Create an account" />
 
             {errorMsg && (
               <div role="alert" style={{ marginBottom: "var(--space-3)", color: "var(--danger)" }}>

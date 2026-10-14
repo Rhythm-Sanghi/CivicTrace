@@ -1,4 +1,4 @@
-/* Benchlight Design System Port for CivicTrace */
+/* CivicTrace Design System — Workshop + Gridline + Studio Utility */
 :root {
   --canvas: #f4f4f1;
   --surface: #fafaf8;
@@ -415,12 +415,14 @@ main.main-viewport {
   outline-offset: -3px;
 }
 
-/* Benchlight Section Headings */
+/* Section Headings */
 .section-heading {
   display: flex;
   gap: var(--space-4);
   align-items: baseline;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
   margin: var(--space-5) 0 var(--space-3);
   padding-top: var(--space-3);
   border-top: 1px solid var(--border);
@@ -496,7 +498,19 @@ main.main-viewport {
   color: var(--text-primary);
 }
 
-/* Benchlight Flat Data Tables */
+/* Flat Data Tables */
+.table-shell {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 0 var(--space-2);
+}
+
+.table-shell table {
+  margin-bottom: 0;
+  min-width: 580px;
+}
+
 table {
   width: 100%;
   table-layout: fixed;
@@ -615,6 +629,27 @@ table td code {
   color: var(--success);
 }
 
+/* Responsive Grid Layouts */
+.responsive-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.responsive-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .responsive-grid-2,
+  .responsive-grid-3 {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+}
+
 /* Split View & Inspector */
 .split {
   display: grid;
@@ -709,17 +744,20 @@ table td code {
 /* Application Status Footer */
 footer.app-status-bar {
   grid-column: 1 / -1;
-  height: var(--status-height);
+  min-height: var(--status-height);
+  height: auto;
   background: var(--surface);
   border-top: 1px solid var(--border);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-4);
+  padding: 4px var(--space-4);
   font-size: 11px;
   color: var(--text-secondary);
   font-family: var(--font-mono);
   user-select: none;
+  gap: var(--space-2);
 }
 
 footer.app-status-bar .status-context {
@@ -799,6 +837,11 @@ footer.app-status-bar .status-version {
   .split.inspecting {
     grid-template-columns: 1fr;
   }
+  .inspector {
+    position: static;
+    max-height: none;
+    width: 100%;
+  }
 }
 
 @media (max-width: 480px) {
@@ -813,10 +856,6 @@ footer.app-status-bar .status-version {
   .workspace {
     padding: var(--space-2) var(--space-3);
   }
-  .table-shell {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
   .toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -827,6 +866,17 @@ footer.app-status-bar .status-version {
   }
   .inspector {
     width: 100%;
+  }
+  input, select, textarea, button {
+    max-width: 100%;
+  }
+  .app-sidebar nav {
+    gap: var(--space-2);
+  }
+  .app-sidebar nav a,
+  .app-sidebar nav button {
+    padding: 6px 10px;
+    font-size: 13px;
   }
 }
 

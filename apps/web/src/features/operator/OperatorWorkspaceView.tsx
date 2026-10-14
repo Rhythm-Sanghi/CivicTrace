@@ -55,7 +55,7 @@ export const OperatorWorkspaceView: React.FC = () => {
         work_summary: workSummary,
         actions_taken: actionsTaken,
       });
-      setStatusMsg("Resolution claim filed! Case status updated to Awaiting Verification.");
+      setStatusMsg("Resolution claim filed. Status updated to Awaiting Verification.");
       setWorkSummary("");
       setActionsTaken("");
       loadCases();
@@ -69,9 +69,8 @@ export const OperatorWorkspaceView: React.FC = () => {
   return (
     <>
       <PageHeading
-        index="06"
-        title="Operator terminal"
-        description={`Active Work Orders & Resolution Claims · Terminal Operator: ${currentUser?.display_name || "Field Unit"} · Log repair operations and file completion evidence. Claims remain in Awaiting Community Verification until verified by the public.`}
+        title="Work orders"
+        description={`Assigned repair orders and resolution claims · Operator: ${currentUser?.display_name || "Field Unit"}`}
       />
 
       <div className="workspace">
@@ -90,14 +89,14 @@ export const OperatorWorkspaceView: React.FC = () => {
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(300px, 1.2fr) minmax(400px, 1.8fr)", gap: "var(--space-5)" }}>
+        <div className="responsive-grid-2" style={{ alignItems: "start" }}>
           {/* Work Orders List */}
           <div>
-            <SectionHeader index="01" title={`Work Order Queue (${assignedCases.length})`} />
+            <SectionHeader title={`Work Order Queue (${assignedCases.length})`} />
 
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
               {assignedCases.length === 0 ? (
-                <p className="empty" style={{ padding: "var(--space-4)" }}>No pending work orders assigned to this terminal.</p>
+                <p className="empty" style={{ padding: "var(--space-4)" }}>No active work orders assigned to this terminal.</p>
               ) : (
                 assignedCases.map((c) => {
                   const isSelected = selectedCase?.id === c.id;
@@ -113,7 +112,7 @@ export const OperatorWorkspaceView: React.FC = () => {
                         background: isSelected ? "var(--selection)" : "transparent",
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", flexWrap: "wrap", gap: "4px" }}>
                         <code style={{ fontWeight: 600 }}>{c.public_id}</code>
                         <StatusStamp state={c.state} size="sm" />
                       </div>
@@ -130,9 +129,9 @@ export const OperatorWorkspaceView: React.FC = () => {
             </div>
           </div>
 
-          {/* Resolution Claim Form */}
+          {/* Resolution Claim Station */}
           <div>
-            <SectionHeader index="02" title="Resolution claim station" />
+            <SectionHeader title="Resolution claim station" />
 
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "var(--space-4)" }}>
               {selectedCase ? (
@@ -158,11 +157,11 @@ export const OperatorWorkspaceView: React.FC = () => {
                   </div>
 
                   <div style={{ marginBottom: "var(--space-3)" }}>
-                    <label htmlFor="actions-textarea">Actions taken & technical specifications</label>
+                    <label htmlFor="actions-textarea">Actions taken & materials used</label>
                     <textarea
                       id="actions-textarea"
                       rows={4}
-                      placeholder="Specify materials applied, measurements, equipment used, and operator crew details..."
+                      placeholder="Specify materials applied, equipment used, measurements, or crew notes..."
                       value={actionsTaken}
                       onChange={(e) => setActionsTaken(e.target.value)}
                       required
@@ -170,14 +169,14 @@ export const OperatorWorkspaceView: React.FC = () => {
                     />
                   </div>
 
-                  <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                  <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
                     {selectedCase.state === "ASSIGNED" && (
                       <button
                         type="button"
                         onClick={handleStartWork}
                         disabled={submitting}
                         className="btn-outline"
-                        style={{ flex: 1, justifyContent: "center" }}
+                        style={{ flex: 1, minWidth: "140px", justifyContent: "center" }}
                       >
                         Start Repair (In Progress)
                       </button>
@@ -186,9 +185,9 @@ export const OperatorWorkspaceView: React.FC = () => {
                       type="submit"
                       disabled={submitting}
                       className="button-primary"
-                      style={{ flex: 1, justifyContent: "center" }}
+                      style={{ flex: 1, minWidth: "160px", justifyContent: "center" }}
                     >
-                      {submitting ? "Submitting claim..." : "File Resolution Claim"}
+                      {submitting ? "Submitting..." : "File Resolution Claim"}
                     </button>
                   </div>
                 </form>

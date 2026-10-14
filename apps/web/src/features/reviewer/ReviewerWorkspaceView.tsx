@@ -40,7 +40,11 @@ export const ReviewerWorkspaceView: React.FC = () => {
   const handleDecision = async (candidateId: string, decision: "APPROVE" | "REJECT") => {
     try {
       await api.decideDuplicate(candidateId, decision, decisionNotes[candidateId]);
-      setActionStatus(`Duplicate candidate successfully ${decision === "APPROVE" ? "consolidated into target case" : "separated into independent case"}.`);
+      setActionStatus(
+        decision === "APPROVE"
+          ? "Duplicate report consolidated into target case."
+          : "Report separated as an independent case."
+      );
       loadData();
     } catch (err: any) {
       setActionStatus(`Error: ${err.message}`);
@@ -50,9 +54,8 @@ export const ReviewerWorkspaceView: React.FC = () => {
   return (
     <>
       <PageHeading
-        index="05"
         title="Reviewer desk"
-        description="Duplicate Correlation & Case Consolidation · Review candidate report pairs identified by the deterministic duplicate engine. Approving merges observations into one verified public case with full provenance."
+        description="Review candidate report pairs identified by the duplicate engine and moderate incoming citizen submissions."
       />
 
       <div className="workspace">
@@ -74,9 +77,8 @@ export const ReviewerWorkspaceView: React.FC = () => {
         {/* Pending Submissions Moderation Section */}
         <div style={{ marginBottom: "var(--space-6)" }}>
           <SectionHeader
-            index="01"
-            title={`Citizen Moderation Queue · ${pendingReports.length} Pending Review`}
-            actionText="Pending Citizen Observations"
+            title="Citizen Moderation Queue"
+            actionText={`${pendingReports.length} pending review`}
           />
           {pendingReports.length === 0 ? (
             <p className="empty" style={{ margin: "var(--space-3) 0" }}>
@@ -93,7 +95,7 @@ export const ReviewerWorkspaceView: React.FC = () => {
                     padding: "var(--space-3) var(--space-4)",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)", flexWrap: "wrap", gap: "4px" }}>
                     <div>
                       <span className="mono" style={{ fontSize: "11px", color: "var(--accent)" }}>{rpt.public_id}</span>
                       <h4 style={{ margin: "2px 0", fontSize: "14px" }}>{rpt.title}</h4>
@@ -124,20 +126,43 @@ export const ReviewerWorkspaceView: React.FC = () => {
           )}
         </div>
 
+        {/* Duplicate Correlation & Consolidation Section */}
         <SectionHeader
-          index="02"
-          title={`Duplicate Correlation & Consolidation · ${candidates.length} Pairs`}
-          actionText="Deterministic Match Engine"
+          title="Duplicate Correlation & Consolidation"
+          actionText={`${candidates.length} candidate pairs`}
         />
 
         {loading ? (
           <p className="muted">Loading duplicate candidates...</p>
         ) : candidates.length === 0 ? (
-          <p className="empty">No pending duplicate candidates. All neighborhood observations are correlated or verified as independent incidents.</p>
+          <p className="empty">No pending duplicate candidates. All reported observations are resolved or verified as distinct incidents.</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", marginTop: "var(--space-3)" }}>
             {candidates.map((cand) => {
-              const explanation = JSON.parse(cand.explanation || "{}");
+              // Extract genuine algorithm reasons from verified backend data
+              let reasons: string[] = [];
+              try {
+                const parsed = JSON.parse(cand.explanation || "{}");
+                if (Array.isArray(parsed.reasons)) {
+                  reasons = parsed.reasons;
+                }
+              } catch {
+                if (cand.explanation && typeof cand.explanation === "string" && !cand.explanation.startsWith("{")) {
+                  reasons = [cand.explanation];
+                }
+              }
+
+              // Fallback only to genuine attributes, NEVER inventing timeframe
+              if (reasons.length === 0) {
+                reasons.push(`Proximity: ${cand.distance_meters.toFixed(1)}m apart`);
+                if (cand.category_score === 1.0) {
+                  reasons.push("Identical infrastructure category");
+                }
+                if (cand.text_score > 0.15) {
+                  reasons.push(`Text similarity: ${(cand.text_score * 100).toFixed(0)}%`);
+                }
+              }
+
               return (
                 <div
                   key={cand.id}
@@ -147,20 +172,26 @@ export const ReviewerWorkspaceView: React.FC = () => {
                     padding: "var(--space-4)",
                   }}
                 >
-                  <SectionHeader
-                    index="01"
-                    title={`Candidate Pair · ${(cand.composite_score * 100).toFixed(0)}% Similarity Match`}
-                    actionText={`Distance: ${cand.distance_meters.toFixed(1)}m`}
-                  />
-
-                  <div style={{ display: "flex", justifyContent: "space-between", margin: "var(--space-3) 0", flexWrap: "wrap", gap: "var(--space-2)" }}>
-                    <div>
-                      <span className="muted" style={{ fontSize: "11px", display: "block" }}>Incoming Citizen Report</span>
-                      <code style={{ fontWeight: 600 }}>{cand.report_id}</code>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)", flexWrap: "wrap", gap: "8px" }}>
+                    <div style={{ fontWeight: 600, fontSize: "14px" }}>
+                      Candidate Pair · {(cand.composite_score * 100).toFixed(0)}% Match
                     </div>
-                    <div>
-                      <span className="muted" style={{ fontSize: "11px", display: "block" }}>Target Incident Dossier</span>
-                      <code style={{ fontWeight: 600 }}>{cand.target_case?.public_id}</code>: {cand.target_case?.title}
+                    <div className="font-mono" style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                      Distance: {cand.distance_meters.toFixed(1)}m
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--space-3)", marginBottom: "var(--space-3)" }}>
+                    <div style={{ background: "var(--surface-muted)", padding: "var(--space-3)", border: "1px solid var(--border)" }}>
+                      <span className="muted" style={{ fontSize: "11px", display: "block", marginBottom: "2px" }}>Incoming Citizen Report</span>
+                      <code style={{ fontWeight: 600, fontSize: "12px" }}>{cand.report_id}</code>
+                    </div>
+                    <div style={{ background: "var(--surface-muted)", padding: "var(--space-3)", border: "1px solid var(--border)" }}>
+                      <span className="muted" style={{ fontSize: "11px", display: "block", marginBottom: "2px" }}>Existing Case</span>
+                      <code style={{ fontWeight: 600, fontSize: "12px" }}>{cand.target_case?.public_id || cand.target_case_id}</code>
+                      {cand.target_case?.title && (
+                        <div style={{ fontSize: "12px", marginTop: "2px" }}>{cand.target_case.title}</div>
+                      )}
                     </div>
                   </div>
 
@@ -169,33 +200,26 @@ export const ReviewerWorkspaceView: React.FC = () => {
                     padding: "var(--space-3)",
                     marginBottom: "var(--space-3)",
                     fontSize: "12px",
+                    border: "1px solid var(--border)",
                   }}>
                     <strong style={{ display: "block", marginBottom: "4px", fontSize: "11px", color: "var(--text-secondary)" }}>
-                      Deterministic Algorithm Rationale:
+                      Matching Evidence:
                     </strong>
-                    <ul style={{ margin: 0, paddingLeft: "16px" }}>
-                      {explanation.reasons ? (
-                        explanation.reasons.map((r: string, idx: number) => (
-                          <li key={idx}>{r}</li>
-                        ))
-                      ) : (
-                        <>
-                          <li>Within neighborhood vicinity ({cand.distance_meters.toFixed(1)}m away)</li>
-                          <li>Identical infrastructure category</li>
-                          <li>Concurrent timeframe (0.0 days apart)</li>
-                        </>
-                      )}
+                    <ul style={{ margin: 0, paddingLeft: "18px" }}>
+                      {reasons.map((r, idx) => (
+                        <li key={idx} style={{ marginBottom: "2px" }}>{r}</li>
+                      ))}
                     </ul>
                   </div>
 
-                  {/* Actions Bar */}
-                  <div className="action-group">
+                  {/* Reviewer Adjudication Actions */}
+                  <div className="action-group" style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
                     <input
                       type="text"
-                      placeholder="Add reviewer consolidation note..."
+                      placeholder="Reviewer consolidation note..."
                       value={decisionNotes[cand.id] || ""}
                       onChange={(e) => setDecisionNotes({ ...decisionNotes, [cand.id]: e.target.value })}
-                      style={{ flex: 1, minWidth: "240px" }}
+                      style={{ flex: "1 1 220px", minWidth: "180px" }}
                     />
 
                     <button

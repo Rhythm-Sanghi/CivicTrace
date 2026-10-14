@@ -91,9 +91,8 @@ export const CasesExplorerView: React.FC = () => {
   return (
     <>
       <PageHeading
-        index="02"
         title="Cases"
-        description="Public infrastructure records and local problem reports. Filter by status, search by road or neighborhood, and review public evidence dossiers."
+        description="Public infrastructure records and defect reports. Filter by status, search by road or neighborhood, and review case history."
       >
         <Link to="/report" className="button-primary">
           Report issue
@@ -101,9 +100,8 @@ export const CasesExplorerView: React.FC = () => {
       </PageHeading>
 
       <div className="workspace">
-        {/* Benchlight Work Toolbar */}
         <div className="toolbar work-toolbar">
-          <div style={{ display: "flex", gap: "var(--space-2)", flex: 1, minWidth: "220px", maxWidth: "340px" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", flex: 1, minWidth: "200px", maxWidth: "340px" }}>
             <input
               type="text"
               placeholder="Filter reference, issue, or street..."
@@ -167,14 +165,14 @@ export const CasesExplorerView: React.FC = () => {
 
         {/* Split View with Flat Table & Inspector */}
         <div className={`split ${isInspectorOpen && activeCase ? "inspecting" : ""}`}>
-          <div style={{ minWidth: 0, overflowX: "auto" }}>
+          <div style={{ minWidth: 0 }}>
             <SectionHeader
-              index="01"
-              title="Public infrastructure records"
+              title="Infrastructure cases"
               actionText={`${filteredAndSortedCases.length} records`}
             />
 
-            <table>
+            <div className="table-shell">
+              <table>
               <thead>
                 <tr>
                   <th
@@ -276,6 +274,7 @@ export const CasesExplorerView: React.FC = () => {
                 )}
               </tbody>
             </table>
+            </div>
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
@@ -326,7 +325,6 @@ export const CasesExplorerView: React.FC = () => {
             <aside className="inspector" aria-label="Case inspector">
               <div className="inspector-header">
                 <div>
-                  <span className="section-index" style={{ marginRight: "6px" }}>02 /</span>
                   <code style={{ fontSize: "13px", fontWeight: 600 }}>{activeCase.public_id}</code>
                 </div>
                 <button
@@ -366,7 +364,7 @@ export const CasesExplorerView: React.FC = () => {
               </div>
 
               <div className="inspector-row">
-                <label>WGS84 Coordinates</label>
+                <label>Coordinates</label>
                 <code className="numeric">
                   {activeCase.latitude.toFixed(5)}, {activeCase.longitude.toFixed(5)}
                 </code>

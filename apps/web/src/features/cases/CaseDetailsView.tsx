@@ -16,7 +16,20 @@ export const CaseDetailsView: React.FC = () => {
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Verification dispute / confirmation form state
+  // In-page operator claim dialog state (replaces prompt/alert)
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [claimWorkSummary, setClaimWorkSummary] = useState("Completed required repair operations.");
+  const [claimActionsTaken, setClaimActionsTaken] = useState("Repaired defect, cleared debris.");
+  const [claimSubmitting, setClaimSubmitting] = useState(false);
+  const [claimError, setClaimError] = useState("");
+
+  // In-page reviewer rework state
+  const [showReworkModal, setShowReworkModal] = useState(false);
+  const [reworkNotes, setReworkNotes] = useState("Dispute sustained; ordered department rework.");
+  const [reworkSubmitting, setReworkSubmitting] = useState(false);
+  const [reworkError, setReworkError] = useState("");
+
+  // Verification observation form state
   const [verificationOutcome, setVerificationOutcome] = useState<string>("CONFIRMED_FIXED");
   const [verificationNotes, setVerificationNotes] = useState<string>("");
   const [verifierName, setVerifierName] = useState<string>("");
@@ -82,10 +95,48 @@ export const CaseDetailsView: React.FC = () => {
     }
   };
 
+  const handleClaimSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!caseItem) return;
+    setClaimSubmitting(true);
+    setClaimError("");
+
+    try {
+      await api.submitResolutionClaim(caseItem.id, {
+        work_summary: claimWorkSummary,
+        actions_taken: claimActionsTaken,
+      });
+      setShowClaimModal(false);
+      loadData();
+    } catch (err: any) {
+      setClaimError(err.message || "Failed to submit resolution claim.");
+    } finally {
+      setClaimSubmitting(false);
+    }
+  };
+
+  const handleReworkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!caseItem) return;
+    setReworkSubmitting(true);
+    setReworkError("");
+
+    try {
+      const updated = await api.transitionCase(caseItem.id, "IN_PROGRESS", reworkNotes);
+      setCaseItem(updated);
+      setShowReworkModal(false);
+      loadData();
+    } catch (err: any) {
+      setReworkError(err.message || "Failed to order department rework.");
+    } finally {
+      setReworkSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="workspace">
-        <p className="muted">Opening local case dossier...</p>
+        <p className="muted">Opening case dossier...</p>
       </div>
     );
   }
@@ -98,11 +149,13 @@ export const CaseDetailsView: React.FC = () => {
     );
   }
 
+  const isVerificationEligible =
+    (caseItem.state === "AWAITING_VERIFICATION" || caseItem.state === "DISPUTED") &&
+    user?.role !== "OPERATOR";
+
   return (
     <>
-      {/* 1. BENCHLIGHT COMPACT PAGE HEADER */}
       <PageHeading
-        index="02"
         title={caseItem.public_id}
         description={`${caseItem.title} · ${caseItem.address_reference}`}
       >
@@ -116,7 +169,6 @@ export const CaseDetailsView: React.FC = () => {
       </PageHeading>
 
       <div className="workspace">
-        {/* 2. FLAT MEASUREMENT METRIC STRIP */}
         <MetricStrip
           metrics={[
             {
@@ -139,7 +191,7 @@ export const CaseDetailsView: React.FC = () => {
           ]}
         />
 
-        {/* 3. OPERATIONAL DOCK (Role Actions) */}
+        {/* Operational Dock (Authorized Roles) */}
         {user && (user.role === "REVIEWER" || user.role === "ADMINISTRATOR" || user.role === "OPERATOR") && (
           <div style={{
             background: "var(--surface)",
@@ -153,7 +205,7 @@ export const CaseDetailsView: React.FC = () => {
             gap: "var(--space-2)",
           }}>
             <div style={{ fontSize: "12px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "8px" }}>
-              <strong>Operational Dock ({user.role}):</strong> State is{" "}
+              <strong>Operational actions ({user.role}):</strong> Current state is{" "}
               <StatusStamp state={caseItem.state} />
             </div>
 
@@ -184,15 +236,7 @@ export const CaseDetailsView: React.FC = () => {
 
               {(user.role === "REVIEWER" || user.role === "ADMINISTRATOR") && caseItem.state === "DISPUTED" && (
                 <button
-                  onClick={async () => {
-                    try {
-                      const updated = await api.transitionCase(caseItem.id, "IN_PROGRESS", "Dispute sustained; ordered department rework");
-                      setCaseItem(updated);
-                      loadData();
-                    } catch (err: any) {
-                      alert(`Error: ${err.message}`);
-                    }
-                  }}
+                  onClick={() => setShowReworkModal(true)}
                   className="button-primary btn-sm"
                 >
                   Order Department Rework
@@ -201,21 +245,7 @@ export const CaseDetailsView: React.FC = () => {
 
               {(user.role === "OPERATOR" || user.role === "ADMINISTRATOR") && (caseItem.state === "ASSIGNED" || caseItem.state === "IN_PROGRESS") && (
                 <button
-                  onClick={async () => {
-                    const summary = window.prompt("Work Summary:", "Completed required repair operations.");
-                    if (!summary) return;
-                    const actions = window.prompt("Actions Taken:", "Repaired defect, cleared debris.");
-                    if (!actions) return;
-                    try {
-                      await api.submitResolutionClaim(caseItem.id, {
-                        work_summary: summary,
-                        actions_taken: actions,
-                      });
-                      loadData();
-                    } catch (err: any) {
-                      alert(`Error: ${err.message}`);
-                    }
-                  }}
+                  onClick={() => setShowClaimModal(true)}
                   className="button-primary btn-sm"
                 >
                   File Resolution Claim
@@ -225,7 +255,96 @@ export const CaseDetailsView: React.FC = () => {
           </div>
         )}
 
-        {/* 4. CRYPTOGRAPHIC LEDGER HEALTH STATUS */}
+        {/* In-Page Modal: Operator Resolution Claim */}
+        {showClaimModal && (
+          <div style={{
+            background: "var(--surface)",
+            border: "1px solid var(--accent)",
+            borderLeft: "3px solid var(--accent)",
+            padding: "var(--space-4)",
+            marginBottom: "var(--space-4)",
+          }}>
+            <h3 style={{ fontSize: "14px", margin: "0 0 var(--space-2)" }}>File Resolution Claim</h3>
+            {claimError && (
+              <div role="alert" style={{ color: "var(--danger)", fontSize: "12px", marginBottom: "var(--space-2)" }}>
+                {claimError}
+              </div>
+            )}
+            <form onSubmit={handleClaimSubmit} style={{ margin: 0 }}>
+              <div style={{ marginBottom: "var(--space-2)" }}>
+                <label htmlFor="modal-work-summary" style={{ fontSize: "12px" }}>Work Summary</label>
+                <input
+                  id="modal-work-summary"
+                  type="text"
+                  value={claimWorkSummary}
+                  onChange={(e) => setClaimWorkSummary(e.target.value)}
+                  required
+                  style={{ width: "100%" }}
+                />
+              </div>
+              <div style={{ marginBottom: "var(--space-3)" }}>
+                <label htmlFor="modal-actions-taken" style={{ fontSize: "12px" }}>Actions Taken</label>
+                <textarea
+                  id="modal-actions-taken"
+                  rows={3}
+                  value={claimActionsTaken}
+                  onChange={(e) => setClaimActionsTaken(e.target.value)}
+                  required
+                  style={{ width: "100%" }}
+                />
+              </div>
+              <div className="action-group">
+                <button type="submit" disabled={claimSubmitting} className="button-primary btn-sm">
+                  {claimSubmitting ? "Submitting..." : "Submit Claim"}
+                </button>
+                <button type="button" onClick={() => setShowClaimModal(false)} className="btn-outline btn-sm">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* In-Page Modal: Reviewer Rework Order */}
+        {showReworkModal && (
+          <div style={{
+            background: "var(--surface)",
+            border: "1px solid var(--warning)",
+            borderLeft: "3px solid var(--warning)",
+            padding: "var(--space-4)",
+            marginBottom: "var(--space-4)",
+          }}>
+            <h3 style={{ fontSize: "14px", margin: "0 0 var(--space-2)" }}>Order Department Rework</h3>
+            {reworkError && (
+              <div role="alert" style={{ color: "var(--danger)", fontSize: "12px", marginBottom: "var(--space-2)" }}>
+                {reworkError}
+              </div>
+            )}
+            <form onSubmit={handleReworkSubmit} style={{ margin: 0 }}>
+              <div style={{ marginBottom: "var(--space-3)" }}>
+                <label htmlFor="modal-rework-notes" style={{ fontSize: "12px" }}>Rework Instructions / Reason</label>
+                <textarea
+                  id="modal-rework-notes"
+                  rows={2}
+                  value={reworkNotes}
+                  onChange={(e) => setReworkNotes(e.target.value)}
+                  required
+                  style={{ width: "100%" }}
+                />
+              </div>
+              <div className="action-group">
+                <button type="submit" disabled={reworkSubmitting} className="button-primary btn-sm">
+                  {reworkSubmitting ? "Updating..." : "Confirm Rework Dispatch"}
+                </button>
+                <button type="button" onClick={() => setShowReworkModal(false)} className="btn-outline btn-sm">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Cryptographic Ledger Health Verification */}
         {ledgerValidation && (
           <div
             role="status"
@@ -261,33 +380,27 @@ export const CaseDetailsView: React.FC = () => {
           </div>
         )}
 
-        {/* 5. INVESTIGATION WORKSPACE (3 Columns: Provenance | Timeline | Verification) */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(260px, 1fr) minmax(360px, 1.8fr) minmax(300px, 1.2fr)",
-          gap: "var(--space-5)",
-          alignItems: "start",
-        }}>
-          {/* COLUMN 1: CASE SUMMARY & PROVENANCE */}
+        {/* Investigation Workspace Grid */}
+        <div className="responsive-grid-3">
+          {/* Column 1: Case Summary & Provenance */}
           <div>
-            <SectionHeader index="01" title="Case summary & provenance" />
+            <SectionHeader title="Case details" />
 
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "var(--space-4)" }}>
               <div style={{ marginBottom: "var(--space-3)" }}>
-                <label>Physical location</label>
+                <label>Location</label>
                 <div style={{ fontWeight: 600 }}>{caseItem.address_reference}</div>
               </div>
 
               <div style={{ marginBottom: "var(--space-3)" }}>
-                <label>WGS84 Coordinates</label>
+                <label>Coordinates</label>
                 <code className="numeric">
-                  LAT: {caseItem.latitude.toFixed(6)}<br />
-                  LON: {caseItem.longitude.toFixed(6)}
+                  {caseItem.latitude.toFixed(6)}, {caseItem.longitude.toFixed(6)}
                 </code>
               </div>
 
               <div style={{ marginBottom: "var(--space-3)" }}>
-                <label>Independent submissions</label>
+                <label>Reported observations</label>
                 <div>{caseItem.report_count} verified citizen report(s)</div>
               </div>
 
@@ -299,19 +412,18 @@ export const CaseDetailsView: React.FC = () => {
               </div>
 
               <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }}>
-                <label>Verification protocol</label>
+                <label>Verification policy</label>
                 <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: 0, lineHeight: 1.45 }}>
-                  CivicTrace requires 2 distinct citizen accounts or reviewer audit to close an uncontested case. Any adverse citizen inspection immediately sets status to DISPUTED.
+                  CivicTrace records all citizen observations directly into the append-only ledger. Under conservative identity policy, community observations provide public accountability, and formal automatic closure requires trusted identity credentials or authorized reviewer sign-off.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* COLUMN 2: TIMELINE */}
+          {/* Column 2: Case History Timeline */}
           <div>
             <SectionHeader
-              index="02"
-              title={`Append-Only Accountability Timeline (${events.length} Events)`}
+              title={`Case history (${events.length} events)`}
             />
 
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
@@ -328,6 +440,8 @@ export const CaseDetailsView: React.FC = () => {
                 else if (evt.event_type.includes("CLAIM")) borderAccent = "var(--warning)";
                 else if (evt.event_type.includes("ASSIGN") || evt.event_type.includes("IN_PROGRESS")) borderAccent = "var(--information)";
 
+                const displayType = evt.event_type.replace(/_/g, " ");
+
                 return (
                   <div
                     key={evt.id}
@@ -338,7 +452,7 @@ export const CaseDetailsView: React.FC = () => {
                       padding: "var(--space-3) var(--space-4)",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", flexWrap: "wrap", gap: "4px" }}>
                       <code style={{ fontSize: "11px", fontWeight: 600 }}>EVENT #{evt.event_index}</code>
                       <span className="numeric" style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                         {new Date(evt.created_at).toLocaleString()}
@@ -346,116 +460,143 @@ export const CaseDetailsView: React.FC = () => {
                     </div>
 
                     <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>
-                      {evt.event_type.replace(/_/g, " ")}
+                      {displayType}
                     </div>
-                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "6px" }}>
+                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "4px" }}>
                       Recorded by: <strong>{evt.public_actor_label}</strong>
                     </div>
 
-                    <div style={{
-                      background: "var(--surface-muted)",
-                      padding: "6px var(--space-2)",
-                      fontSize: "11px",
-                      fontFamily: "var(--font-mono)",
-                      color: "var(--text-primary)",
-                      overflowX: "auto",
-                      marginBottom: "6px",
-                    }}>
-                      {Object.entries(payload).map(([k, v]) => (
-                        <div key={k}>
-                          <strong>{k}:</strong> {typeof v === "object" ? JSON.stringify(v) : String(v)}
-                        </div>
-                      ))}
-                    </div>
+                    {(payload.work_summary || payload.notes || payload.outcome) && (
+                      <div style={{ fontSize: "12px", color: "var(--text-primary)", marginBottom: "6px" }}>
+                        {payload.work_summary && <div>{payload.work_summary}</div>}
+                        {payload.actions_taken && <div className="muted">{payload.actions_taken}</div>}
+                        {payload.notes && <div>{payload.notes}</div>}
+                      </div>
+                    )}
 
-                    <div style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "10px",
-                      color: "var(--text-muted)",
-                      fontFamily: "var(--font-mono)",
-                    }}>
-                      <span>PREV: {evt.previous_event_hash.substring(0, 16)}...</span>
-                      <span>HASH: {evt.current_event_hash.substring(0, 16)}...</span>
-                    </div>
+                    {/* Expandable Cryptographic Data Proofs */}
+                    <details style={{ marginTop: "6px", fontSize: "11px", color: "var(--text-secondary)" }}>
+                      <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+                        Technical verification data
+                      </summary>
+                      <div style={{
+                        background: "var(--surface-muted)",
+                        padding: "var(--space-2)",
+                        marginTop: "4px",
+                        border: "1px solid var(--border)",
+                        fontFamily: "var(--font-mono)",
+                        overflowX: "auto",
+                        fontSize: "10px",
+                      }}>
+                        <div><strong>Schema:</strong> v{evt.schema_version} · <strong>Index:</strong> #{evt.event_index}</div>
+                        <div><strong>Previous Hash:</strong> {evt.previous_event_hash}</div>
+                        <div><strong>Event Hash:</strong> {evt.current_event_hash}</div>
+                        <div style={{ marginTop: "4px" }}><strong>Payload JSON:</strong> {typeof evt.payload_json === "string" ? evt.payload_json : JSON.stringify(evt.payload_json)}</div>
+                      </div>
+                    </details>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          {/* COLUMN 3: CITIZEN VERIFICATION STATION */}
+          {/* Column 3: Check a Reported Repair (Citizen Verification) */}
           <div>
-            <SectionHeader index="03" title="Independent Citizen Verification" />
+            <SectionHeader title="Check a reported repair" />
 
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "var(--space-4)" }}>
-              <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.45, marginBottom: "var(--space-3)" }}>
-                Have you inspected this location? In CivicTrace, operator claims do not close a case. Citizen verification confirms whether the defect is genuinely repaired.
-              </p>
+              {isVerificationEligible ? (
+                <>
+                  <p style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.45, marginBottom: "var(--space-3)" }}>
+                    Have you inspected this location? In CivicTrace, operator claims do not automatically close a case. Independent citizen verification confirms whether the defect is genuinely fixed.
+                  </p>
 
-              {feedbackMsg && (
-                <div style={{
-                  padding: "var(--space-2) var(--space-3)",
-                  fontSize: "12px",
-                  marginBottom: "var(--space-3)",
-                  borderLeft: `2px solid ${feedbackMsg.includes("Error") ? "var(--danger)" : "var(--success)"}`,
-                  background: "var(--surface-muted)",
-                  color: feedbackMsg.includes("Error") ? "var(--danger)" : "var(--success)",
-                }}>
-                  {feedbackMsg}
+                  {feedbackMsg && (
+                    <div style={{
+                      padding: "var(--space-2) var(--space-3)",
+                      fontSize: "12px",
+                      marginBottom: "var(--space-3)",
+                      borderLeft: `2px solid ${feedbackMsg.includes("Error") ? "var(--danger)" : "var(--success)"}`,
+                      background: "var(--surface-muted)",
+                      color: feedbackMsg.includes("Error") ? "var(--danger)" : "var(--success)",
+                    }}>
+                      {feedbackMsg}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleVerificationSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+                    <div>
+                      <label htmlFor="outcome-select">Observation outcome</label>
+                      <select
+                        id="outcome-select"
+                        value={verificationOutcome}
+                        onChange={(e) => setVerificationOutcome(e.target.value)}
+                        style={{ width: "100%" }}
+                      >
+                        <option value="CONFIRMED_FIXED">Confirmed Fixed (Repaired satisfactorily)</option>
+                        <option value="STILL_UNRESOLVED">Still Unresolved (Defect persists)</option>
+                        <option value="PARTIALLY_FIXED">Partially Fixed (Substandard repair)</option>
+                        <option value="UNABLE_TO_VERIFY">Unable to Verify (Inaccessible)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="pseudonym-input">Observer name or reference (optional)</label>
+                      <input
+                        id="pseudonym-input"
+                        type="text"
+                        placeholder="e.g. Local Resident, Daily Commuter"
+                        value={verifierName}
+                        onChange={(e) => setVerifierName(e.target.value)}
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="notes-textarea">Inspection details & evidence notes *</label>
+                      <textarea
+                        id="notes-textarea"
+                        rows={3}
+                        placeholder="Describe what you observed on site..."
+                        value={verificationNotes}
+                        onChange={(e) => setVerificationNotes(e.target.value)}
+                        required
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={verificationSubmitting}
+                      className="button-primary"
+                      style={{ width: "100%" }}
+                    >
+                      {verificationSubmitting ? "Submitting..." : "Submit verification observation"}
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                  <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>
+                    {caseItem.state === "RESOLVED"
+                      ? "Case Resolved"
+                      : caseItem.state === "IN_PROGRESS" || caseItem.state === "ASSIGNED"
+                      ? "Repair in Progress"
+                      : user?.role === "OPERATOR"
+                      ? "Operator Verification Restriction"
+                      : "Awaiting Repair Dispatch"}
+                  </div>
+                  <p style={{ margin: "0 0 var(--space-3)" }}>
+                    {caseItem.state === "RESOLVED"
+                      ? "This infrastructure case has been verified and resolved. If the defect has recurred at this location, please submit a new report."
+                      : caseItem.state === "IN_PROGRESS" || caseItem.state === "ASSIGNED"
+                      ? "Crews are currently addressing this issue. Verification opens once public works operators file a resolution claim."
+                      : user?.role === "OPERATOR"
+                      ? "Department operators cannot verify their own resolution claims. Independent citizen verification is required."
+                      : "This case is currently under review. Independent citizen verification opens after repair work is completed and claimed."}
+                  </p>
                 </div>
               )}
-
-              <form onSubmit={handleVerificationSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-                <div>
-                  <label htmlFor="outcome-select">Observation Outcome</label>
-                  <select
-                    id="outcome-select"
-                    value={verificationOutcome}
-                    onChange={(e) => setVerificationOutcome(e.target.value)}
-                    style={{ width: "100%" }}
-                  >
-                    <option value="CONFIRMED_FIXED">Confirmed Fixed (Repaired satisfactorily)</option>
-                    <option value="STILL_UNRESOLVED">Still Unresolved (Defect persists)</option>
-                    <option value="PARTIALLY_FIXED">Partially Fixed (Substandard repair)</option>
-                    <option value="UNABLE_TO_VERIFY">Unable to Verify (Inaccessible)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="pseudonym-input">Inspector Pseudonym or Reference</label>
-                  <input
-                    id="pseudonym-input"
-                    type="text"
-                    placeholder="e.g. Local Resident, Daily Commuter"
-                    value={verifierName}
-                    onChange={(e) => setVerifierName(e.target.value)}
-                    style={{ width: "100%" }}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="notes-textarea">Evidence Notes & Inspection Details</label>
-                  <textarea
-                    id="notes-textarea"
-                    rows={3}
-                    placeholder="Describe what you observed on site..."
-                    value={verificationNotes}
-                    onChange={(e) => setVerificationNotes(e.target.value)}
-                    required
-                    style={{ width: "100%" }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={verificationSubmitting}
-                  className="button-primary"
-                  style={{ width: "100%" }}
-                >
-                  {verificationSubmitting ? "Submitting..." : "Submit Verification Observation"}
-                </button>
-              </form>
             </div>
           </div>
         </div>

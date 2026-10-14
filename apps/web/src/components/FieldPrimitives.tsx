@@ -1,29 +1,29 @@
 import React from "react";
 import { Link } from "react-router-dom";
 
-// 1. Benchlight Page Header Primitive
+// CivicTrace Page Header Primitive
 export interface PageHeadingProps {
   index?: string;
-  eyebrow?: string; // fallback if index omitted
+  eyebrow?: string;
   title: string;
   description?: string;
   children?: React.ReactNode;
 }
 
 export const PageHeading: React.FC<PageHeadingProps> = ({
-  index = "01",
-  eyebrow,
+  index,
   title,
   description,
   children,
 }) => {
-  const displayIndex = index || (eyebrow ? eyebrow.slice(0, 2) : "01");
   return (
     <header className="page-header">
       <div className="page-heading">
-        <span className="page-index" aria-hidden="true">
-          {displayIndex} /
-        </span>
+        {index && (
+          <span className="page-index" aria-hidden="true">
+            {index} /
+          </span>
+        )}
         <div>
           <h1 id="page-title">{title}</h1>
           {description && <p>{description}</p>}
@@ -34,7 +34,7 @@ export const PageHeading: React.FC<PageHeadingProps> = ({
   );
 };
 
-// 2. Benchlight Flat Measurement / Metric Strip Primitive
+// CivicTrace Metric Strip Primitive
 export interface MetricItem {
   label: string;
   value: string | number;
@@ -57,7 +57,7 @@ export const MetricStrip: React.FC<MetricStripProps> = ({ metrics }) => (
   </dl>
 );
 
-// 3. Benchlight Status Mark Primitive (Restrained colored square + label)
+// CivicTrace Status Stamp Primitive
 export interface StatusStampProps {
   state: string;
   size?: "sm" | "md";
@@ -82,7 +82,7 @@ export const StatusStamp: React.FC<StatusStampProps> = ({ state }) => {
   );
 };
 
-// 4. Benchlight Section Heading Primitive
+// CivicTrace Section Header Primitive
 export interface SectionHeaderProps {
   index?: string;
   title: string;
@@ -103,11 +103,15 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
       {index && <span className="section-index">{index}</span>}
       {title}
     </h2>
-    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-      {actionText && actionHref && (
-        <Link to={actionHref} className="section-detail">
-          {actionText}
-        </Link>
+    <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+      {actionText && (
+        actionHref ? (
+          <Link to={actionHref} className="section-detail">
+            {actionText}
+          </Link>
+        ) : (
+          <span className="section-detail">{actionText}</span>
+        )
       )}
       {children}
     </div>

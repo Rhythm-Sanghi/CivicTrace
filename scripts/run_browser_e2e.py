@@ -12,8 +12,8 @@ from playwright.sync_api import sync_playwright
 api_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "services", "api"))
 sys.path.insert(0, api_dir)
 
-API_BASE = "http://localhost:8000/api/v1"
-WEB_BASE = "http://localhost:5173"
+API_BASE = "http://127.0.0.1:8000/api/v1"
+WEB_BASE = "http://127.0.0.1:5173"
 
 def run_real_e2e_lifecycle():
     print("=====================================================================")
@@ -55,11 +55,12 @@ def run_real_e2e_lifecycle():
         # 2. Start frontend process
         web_dir = os.path.abspath(os.path.join(api_dir, "..", "..", "apps", "web"))
         print("  [Setup] Launching frontend Vite server on port 5173...")
+        vite_log = open(os.path.join(tempfile.gettempdir(), "e2e_vite.log"), "w", encoding="utf-8")
         frontend_proc = subprocess.Popen(
-            ["npx.cmd" if os.name == "nt" else "npx", "vite", "--port", "5173"],
+            ["npx.cmd" if os.name == "nt" else "npx", "vite", "--port", "5173", "--strictPort", "--host", "127.0.0.1"],
             cwd=web_dir,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=vite_log,
+            stderr=vite_log,
         )
 
         # 3. Wait for backend and frontend readiness
@@ -120,9 +121,12 @@ def run_real_e2e_lifecycle():
             defect_title = f"Exposed high-voltage electrical cable on Jawahar Marg #{run_id}"
             defect_desc = "Severed underground cable conduit protruding onto pedestrian walkway. Direct shock hazard to pedestrians."
 
-            page.fill("input[placeholder*='e.g. Deep pothole']", defect_title)
-            page.fill("textarea[placeholder*='Detail what you observed']", defect_desc)
-            page.fill("input[placeholder*='Near Rajwada Palace']", "Jawahar Marg crossing, Ward 12")
+            page.fill("input#title-input, input[placeholder*='e.g. Deep pothole']", defect_title)
+            page.fill("textarea#desc-input, textarea[placeholder*='hazard'], textarea[placeholder*='Detail what you observed']", defect_desc)
+            page.fill("input#addr-input, input[placeholder*='Near Rajwada Palace']", "Jawahar Marg crossing, Ward 12")
+
+            # Explicitly select coordinates via sample location button
+            page.click("button:has-text('Use sample location')")
 
             # Create dummy image file for evidence upload
             temp_img = os.path.join(tempfile.gettempdir(), f"evidence_{run_id}.png")
@@ -131,8 +135,8 @@ def run_real_e2e_lifecycle():
                 f.write(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82")
 
             page.set_input_files("input[type='file']", temp_img)
-            page.click("button:has-text('Submit public defect observation')")
-            page.wait_for_selector("text=Observation Successfully Registered", timeout=10000)
+            page.click("button:has-text('Submit issue report'), button:has-text('Submit public defect observation')")
+            page.wait_for_selector("text=Issue Report Registered", timeout=10000)
             print("  [OK] Defect observation and evidence file uploaded successfully.")
 
             # Step 3: Pending moderation visibility
@@ -239,7 +243,7 @@ def run_real_e2e_lifecycle():
             page.select_option("select#outcome-select", value="STILL_UNRESOLVED")
             page.fill("input#pseudonym-input", citizen_name)
             page.fill("textarea#notes-textarea", "Checked at 5:00 PM. The plastic conduit is still uncovered and wires exposed across the sidewalk curb!")
-            page.click("button:has-text('Submit Verification Observation')")
+            page.click("button:has-text('Submit verification observation'), button:has-text('Submit Verification Observation'), button:has-text('Submit observation')")
             page.wait_for_selector("text=Verification observation successfully submitted", timeout=10000)
 
             # Step 10: Automatic closure remains blocked during an unresolved dispute
@@ -262,6 +266,9 @@ def run_real_e2e_lifecycle():
             page.goto(f"{WEB_BASE}/cases/{case_public_id}")
             page.wait_for_selector("text=Order Department Rework", timeout=15000)
             page.click("text=Order Department Rework")
+            time.sleep(0.5)
+            if page.is_visible("button:has-text('Confirm Rework Dispatch')"):
+                page.click("button:has-text('Confirm Rework Dispatch')")
             time.sleep(1)
             page.wait_for_selector("text=IN PROGRESS", timeout=10000)
             print("  [OK] Reviewer adjudicated dispute; case transitioned back to IN_PROGRESS for rework.")

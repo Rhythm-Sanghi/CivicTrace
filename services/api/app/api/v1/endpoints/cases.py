@@ -133,6 +133,28 @@ def get_neighborhood_stats(db: Session = Depends(get_db)):
         p_band = c.priority_band.value
         priority_counts[p_band] = priority_counts.get(p_band, 0) + 1
 
+    total_claims = db.query(ResolutionClaim).count()
+    verified_claims = (
+        db.query(ResolutionClaim).filter(ResolutionClaim.status == "VERIFIED").count()
+    )
+    disputed_claims = (
+        db.query(ResolutionClaim).filter(ResolutionClaim.status == "DISPUTED").count()
+    )
+    awaiting_claims = (
+        db.query(ResolutionClaim).filter(ResolutionClaim.status == "AWAITING_VERIFICATION").count()
+    )
+    total_observations = db.query(VerificationObservation).count()
+    confirmed_observations = (
+        db.query(VerificationObservation)
+        .filter(VerificationObservation.outcome == VerificationOutcome.CONFIRMED_FIXED)
+        .count()
+    )
+    dispute_observations = (
+        db.query(VerificationObservation)
+        .filter(VerificationObservation.is_dispute == True)  # noqa: E712
+        .count()
+    )
+
     return {
         "service_area": "Indore Central & North Ward",
         "open_cases": open_cases,
@@ -144,6 +166,13 @@ def get_neighborhood_stats(db: Session = Depends(get_db)):
         "median_resolution_days": median_days,
         "category_counts": category_counts,
         "priority_counts": priority_counts,
+        "total_claims": total_claims,
+        "verified_claims": verified_claims,
+        "disputed_claims": disputed_claims,
+        "awaiting_claims": awaiting_claims,
+        "total_observations": total_observations,
+        "confirmed_observations": confirmed_observations,
+        "dispute_observations": dispute_observations,
     }
 
 

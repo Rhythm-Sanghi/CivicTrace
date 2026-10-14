@@ -17,13 +17,11 @@ export const ReportIssueView: React.FC = () => {
   const [description, setDescription] = useState<string>(() => {
     return localStorage.getItem("civictrace_draft_desc") || "";
   });
-  const [latitude, setLatitude] = useState<number>(() => {
-    const saved = localStorage.getItem("civictrace_draft_lat");
-    return saved ? parseFloat(saved) : 22.7196; // Indore default
+  const [latitude, setLatitude] = useState<string>(() => {
+    return localStorage.getItem("civictrace_draft_lat") || "";
   });
-  const [longitude, setLongitude] = useState<number>(() => {
-    const saved = localStorage.getItem("civictrace_draft_lon");
-    return saved ? parseFloat(saved) : 75.8577;
+  const [longitude, setLongitude] = useState<string>(() => {
+    return localStorage.getItem("civictrace_draft_lon") || "";
   });
   const [addressRef, setAddressRef] = useState<string>(() => {
     return localStorage.getItem("civictrace_draft_addr") || "";
@@ -38,6 +36,7 @@ export const ReportIssueView: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [locationFeedback, setLocationFeedback] = useState<string>("");
+  const [locationFeedbackType, setLocationFeedbackType] = useState<"info" | "warning" | "success">("info");
   const [successResult, setSuccessResult] = useState<any | null>(null);
 
   // Auto-save drafts
@@ -45,8 +44,8 @@ export const ReportIssueView: React.FC = () => {
     localStorage.setItem("civictrace_draft_cat", categoryId);
     localStorage.setItem("civictrace_draft_title", title);
     localStorage.setItem("civictrace_draft_desc", description);
-    localStorage.setItem("civictrace_draft_lat", latitude.toString());
-    localStorage.setItem("civictrace_draft_lon", longitude.toString());
+    localStorage.setItem("civictrace_draft_lat", latitude);
+    localStorage.setItem("civictrace_draft_lon", longitude);
     localStorage.setItem("civictrace_draft_addr", addressRef);
     localStorage.setItem("civictrace_draft_name", pseudonym);
   }, [categoryId, title, description, latitude, longitude, addressRef, pseudonym]);
@@ -68,11 +67,14 @@ export const ReportIssueView: React.FC = () => {
     localStorage.removeItem("civictrace_draft_name");
     setTitle("");
     setDescription("");
+    setLatitude("");
+    setLongitude("");
     setAddressRef("");
     setPseudonym("");
     setEvidenceFile(null);
     if (evidencePreviewUrl) URL.revokeObjectURL(evidencePreviewUrl);
     setEvidencePreviewUrl(null);
+    setLocationFeedback("");
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,32 +109,70 @@ export const ReportIssueView: React.FC = () => {
   const handleUseBrowserLocation = () => {
     setLocationFeedback("");
     if ("geolocation" in navigator) {
+      setLocationFeedback("Requesting device location...");
+      setLocationFeedbackType("info");
+
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setLatitude(pos.coords.latitude);
-          setLongitude(pos.coords.longitude);
-          setLocationFeedback("Browser GPS coordinates acquired successfully.");
+          setLatitude(pos.coords.latitude.toFixed(6));
+          setLongitude(pos.coords.longitude.toFixed(6));
+          const accuracy = Math.round(pos.coords.accuracy);
+          setLocationFeedback(`GPS coordinates acquired (accuracy: ±${accuracy}m).`);
+          setLocationFeedbackType("success");
         },
-        () => {
-          setLocationFeedback("GPS lock unavailable. Manual Indore coordinates active.");
-        }
+        (err) => {
+          if (err.code === 1) {
+            setLocationFeedback("Location access was denied. Please enter coordinates manually.");
+          } else if (err.code === 2) {
+            setLocationFeedback("Location signal unavailable. Please enter coordinates manually.");
+          } else if (err.code === 3) {
+            setLocationFeedback("Location request timed out. Please retry or enter coordinates manually.");
+          } else {
+            setLocationFeedback("Could not determine location. Please enter coordinates manually.");
+          }
+          setLocationFeedbackType("warning");
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
       );
     } else {
-      setLocationFeedback("Geolocation API unsupported by browser.");
+      setLocationFeedback("Geolocation is not supported by your browser. Please enter coordinates manually.");
+      setLocationFeedbackType("warning");
     }
   };
 
+  const handleUseSampleCoordinates = () => {
+    setLatitude("22.719600");
+    setLongitude("75.857700");
+    setLocationFeedback("Loaded sample coordinates: Indore Ward 34 (Demonstration data).");
+    setLocationFeedbackType("info");
+  };
+
+  const parsedLat = parseFloat(latitude);
+  const parsedLon = parseFloat(longitude);
+  const hasValidCoordinates =
+    !isNaN(parsedLat) &&
+    !isNaN(parsedLon) &&
+    parsedLat >= -90 &&
+    parsedLat <= 90 &&
+    parsedLon >= -180 &&
+    parsedLon <= 180 &&
+    (parsedLat !== 0 || parsedLon !== 0);
+
   const isDescribeValid = title.trim().length >= 5 && description.trim().length >= 10;
-  const isLocateValid = latitude !== 0 && longitude !== 0 && addressRef.trim().length >= 3;
+  const isLocateValid = hasValidCoordinates && addressRef.trim().length >= 3;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isDescribeValid) {
-      setErrorMsg("Please enter a valid issue title (at least 5 characters) and description (at least 10 characters).");
+      setErrorMsg("Please enter an issue title (at least 5 characters) and description (at least 10 characters).");
       return;
     }
-    if (!isLocateValid) {
-      setErrorMsg("Please provide a valid street or landmark location reference.");
+    if (!hasValidCoordinates) {
+      setErrorMsg("Please confirm location coordinates using GPS, manual entry, or sample data.");
+      return;
+    }
+    if (addressRef.trim().length < 3) {
+      setErrorMsg("Please provide a street or landmark reference (at least 3 characters).");
       return;
     }
 
@@ -144,8 +184,8 @@ export const ReportIssueView: React.FC = () => {
         category_id: categoryId,
         title: title.trim(),
         description: description.trim(),
-        latitude,
-        longitude,
+        latitude: parsedLat,
+        longitude: parsedLon,
         address_reference: addressRef.trim(),
         guest_pseudonym: pseudonym.trim() || undefined,
       });
@@ -180,9 +220,8 @@ export const ReportIssueView: React.FC = () => {
   return (
     <>
       <PageHeading
-        index="04"
-        title="Report issue"
-        description="Report an Infrastructure Defect. Submit an individual public observation. CivicTrace will automatically compute duplicate similarity against existing cases and initiate cryptographic evidence tracking."
+        title="Report an issue"
+        description="Submit an infrastructure issue for municipal repair and public tracking. Reports are checked for duplicates and logged to the public ledger."
       />
 
       <div className="workspace">
@@ -195,11 +234,11 @@ export const ReportIssueView: React.FC = () => {
             padding: "var(--space-5)",
           }}>
             <h2 style={{ fontSize: "16px", fontWeight: 600, color: "var(--success)", margin: "0 0 var(--space-2)" }}>
-              Observation Successfully Registered
+              Issue Report Registered
             </h2>
 
             <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "var(--space-4)", lineHeight: 1.5 }}>
-              Your field observation has been registered into the append-only ledger and submitted to the deterministic correlation engine.
+              Your report has been recorded into the public ledger. You can follow its progress, track operator work claims, and participate in resolution verification.
             </p>
 
             <div style={{
@@ -212,8 +251,8 @@ export const ReportIssueView: React.FC = () => {
               gap: "6px",
               border: "1px solid var(--border)",
             }}>
-              <div><strong>Report Reference:</strong> <code style={{ fontWeight: 600 }}>{successResult.public_id}</code></div>
-              <div><strong>Hazard Category:</strong> {selectedCategoryObj?.name || successResult.category?.name}</div>
+              <div><strong>Reference ID:</strong> <code style={{ fontWeight: 600 }}>{successResult.public_id}</code></div>
+              <div><strong>Category:</strong> {selectedCategoryObj?.name || successResult.category?.name}</div>
               <div><strong>Title:</strong> {successResult.title}</div>
               <div><strong>Location:</strong> {successResult.address_reference}</div>
               <div><strong>Coordinates:</strong> <code className="numeric">{successResult.latitude.toFixed(5)}, {successResult.longitude.toFixed(5)}</code></div>
@@ -233,7 +272,7 @@ export const ReportIssueView: React.FC = () => {
               >
                 <strong style={{ color: "var(--warning)" }}>Notice on Attached Media:</strong>
                 <p style={{ margin: "4px 0 0", color: "var(--text-secondary)" }}>
-                  Your report was safely created as <code>{successResult.public_id}</code>, but the evidence attachment encountered an issue ({successResult.evidenceError}). You can add or re-upload evidence from the case detail view.
+                  Your report was created as <code>{successResult.public_id}</code>, but the evidence attachment encountered an issue ({successResult.evidenceError}).
                 </p>
               </div>
             )}
@@ -243,26 +282,21 @@ export const ReportIssueView: React.FC = () => {
                 onClick={() => navigate("/explorer")}
                 className="button-primary"
               >
-                View in Public Cases Explorer
+                Browse all cases
               </button>
               <button
                 onClick={() => setSuccessResult(null)}
                 className="btn-outline"
               >
-                Submit another observation
+                Report another issue
               </button>
             </div>
           </div>
         ) : (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1.6fr) minmax(300px, 1fr)",
-            gap: "var(--space-5)",
-            alignItems: "start",
-          }}>
+          <div className="responsive-grid-2" style={{ alignItems: "start" }}>
             {/* Form Container */}
             <div>
-              <SectionHeader index="01" title="Defect intake form" />
+              <SectionHeader title="Report details" />
 
               {errorMsg && (
                 <div role="alert" style={{
@@ -279,14 +313,14 @@ export const ReportIssueView: React.FC = () => {
 
               <div style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "var(--space-4)" }}>
                 <form onSubmit={handleSubmit} style={{ margin: 0 }}>
-                  {/* Stage 1: Describe Defect */}
+                  {/* Step 1: Issue details */}
                   <div style={{ marginBottom: "var(--space-4)" }}>
                     <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--accent)", marginBottom: "var(--space-2)" }}>
-                      STAGE 1: DESCRIBE DEFECT
+                      1. ISSUE DETAILS
                     </div>
 
                     <div style={{ marginBottom: "var(--space-3)" }}>
-                      <label htmlFor="cat-select">Hazard category</label>
+                      <label htmlFor="cat-select">Category *</label>
                       <select
                         id="cat-select"
                         value={categoryId}
@@ -301,7 +335,7 @@ export const ReportIssueView: React.FC = () => {
                     </div>
 
                     <div style={{ marginBottom: "var(--space-3)" }}>
-                      <label htmlFor="title-input">Brief summary / title *</label>
+                      <label htmlFor="title-input">Title / Short summary *</label>
                       <input
                         id="title-input"
                         type="text"
@@ -317,11 +351,11 @@ export const ReportIssueView: React.FC = () => {
                     </div>
 
                     <div style={{ marginBottom: "var(--space-3)" }}>
-                      <label htmlFor="desc-input">Observed details & severity *</label>
+                      <label htmlFor="desc-input">Description & observed severity *</label>
                       <textarea
                         id="desc-input"
                         rows={3}
-                        placeholder="Detail what you observed, physical depth, hazards to pedestrians, water leaks, or safety risks..."
+                        placeholder="Describe the defect, dimensions, potential hazards to pedestrians or vehicles..."
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         required
@@ -333,67 +367,14 @@ export const ReportIssueView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Stage 2: Locate Defect */}
+                  {/* Step 2: Location */}
                   <div style={{
                     marginBottom: "var(--space-4)",
                     paddingTop: "var(--space-3)",
                     borderTop: "1px solid var(--border)",
                   }}>
                     <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--accent)", marginBottom: "var(--space-2)" }}>
-                      STAGE 2: LOCATE DEFECT
-                    </div>
-
-                    <div style={{
-                      background: "var(--surface-muted)",
-                      padding: "var(--space-3)",
-                      border: "1px solid var(--border)",
-                      marginBottom: "var(--space-3)",
-                    }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)" }}>
-                          WGS84 Coordinates
-                        </span>
-                        <button
-                          type="button"
-                          onClick={handleUseBrowserLocation}
-                          className="btn-outline btn-sm"
-                        >
-                          Acquire browser GPS
-                        </button>
-                      </div>
-
-                      {locationFeedback && (
-                        <div style={{ fontSize: "11px", color: "var(--accent)", marginBottom: "var(--space-2)" }}>
-                          {locationFeedback}
-                        </div>
-                      )}
-
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)", marginBottom: "var(--space-2)" }}>
-                        <div>
-                          <label htmlFor="lat-input" style={{ fontSize: "11px" }}>Latitude</label>
-                          <input
-                            id="lat-input"
-                            type="number"
-                            step="0.000001"
-                            value={latitude}
-                            onChange={(e) => setLatitude(parseFloat(e.target.value) || 0)}
-                            required
-                            style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "12px" }}
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="lon-input" style={{ fontSize: "11px" }}>Longitude</label>
-                          <input
-                            id="lon-input"
-                            type="number"
-                            step="0.000001"
-                            value={longitude}
-                            onChange={(e) => setLongitude(parseFloat(e.target.value) || 0)}
-                            required
-                            style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "12px" }}
-                          />
-                        </div>
-                      </div>
+                      2. LOCATION
                     </div>
 
                     <div style={{ marginBottom: "var(--space-3)" }}>
@@ -408,23 +389,99 @@ export const ReportIssueView: React.FC = () => {
                         style={{ width: "100%" }}
                       />
                       {addressRef.length > 0 && addressRef.length < 3 && (
-                        <span style={{ fontSize: "11px", color: "var(--danger)" }}>Please specify street or landmark.</span>
+                        <span style={{ fontSize: "11px", color: "var(--danger)" }}>Please specify street or landmark (at least 3 characters).</span>
                       )}
+                    </div>
+
+                    <div style={{
+                      background: "var(--surface-muted)",
+                      padding: "var(--space-3)",
+                      border: "1px solid var(--border)",
+                      marginBottom: "var(--space-3)",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                        <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)" }}>
+                          Coordinates (GPS or Manual)
+                        </span>
+                        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            onClick={handleUseBrowserLocation}
+                            className="btn-outline btn-sm"
+                          >
+                            Acquire browser GPS
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleUseSampleCoordinates}
+                            className="btn-outline btn-sm"
+                            title="Load sample coordinates for testing"
+                          >
+                            Use sample location
+                          </button>
+                        </div>
+                      </div>
+
+                      {locationFeedback && (
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            color:
+                              locationFeedbackType === "success"
+                                ? "var(--success)"
+                                : locationFeedbackType === "warning"
+                                ? "var(--danger)"
+                                : "var(--accent)",
+                            marginBottom: "var(--space-2)",
+                          }}
+                        >
+                          {locationFeedback}
+                        </div>
+                      )}
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
+                        <div>
+                          <label htmlFor="lat-input" style={{ fontSize: "11px" }}>Latitude</label>
+                          <input
+                            id="lat-input"
+                            type="number"
+                            step="0.000001"
+                            placeholder="e.g. 22.719600"
+                            value={latitude}
+                            onChange={(e) => setLatitude(e.target.value)}
+                            required
+                            style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "12px" }}
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="lon-input" style={{ fontSize: "11px" }}>Longitude</label>
+                          <input
+                            id="lon-input"
+                            type="number"
+                            step="0.000001"
+                            placeholder="e.g. 75.857700"
+                            value={longitude}
+                            onChange={(e) => setLongitude(e.target.value)}
+                            required
+                            style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "12px" }}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Stage 3: Evidentiary Attachments */}
+                  {/* Step 3: Optional evidence & observer */}
                   <div style={{
                     marginBottom: "var(--space-4)",
                     paddingTop: "var(--space-3)",
                     borderTop: "1px solid var(--border)",
                   }}>
                     <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--accent)", marginBottom: "var(--space-2)" }}>
-                      STAGE 3: EVIDENTIARY ATTACHMENTS & OBSERVER
+                      3. EVIDENCE & OBSERVER (OPTIONAL)
                     </div>
 
                     <div style={{ marginBottom: "var(--space-3)" }}>
-                      <label htmlFor="name-input">Observer pseudonym / display name (optional)</label>
+                      <label htmlFor="name-input">Observer name or pseudonym (optional)</label>
                       <input
                         id="name-input"
                         type="text"
@@ -436,7 +493,7 @@ export const ReportIssueView: React.FC = () => {
                     </div>
 
                     <div style={{ marginBottom: "var(--space-3)" }}>
-                      <label htmlFor="file-input">Attach photographic evidence (optional, max 10MB)</label>
+                      <label htmlFor="file-input">Attach photo or document (optional, max 10MB)</label>
                       <input
                         id="file-input"
                         type="file"
@@ -454,7 +511,7 @@ export const ReportIssueView: React.FC = () => {
                         background: "var(--surface-muted)",
                       }}>
                         <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "4px" }}>
-                          Attached Preview: {evidenceFile?.name} ({(evidenceFile!.size / 1024).toFixed(0)} KB)
+                          Attached: {evidenceFile?.name} ({(evidenceFile!.size / 1024).toFixed(0)} KB)
                         </div>
                         <img
                           src={evidencePreviewUrl}
@@ -465,46 +522,36 @@ export const ReportIssueView: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Stage 4: Review Summary Box */}
-                  <div style={{
-                    marginBottom: "var(--space-4)",
-                    padding: "var(--space-3)",
-                    background: "var(--surface-muted)",
-                    border: "1px solid var(--border)",
-                  }}>
-                    <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "var(--space-1)" }}>
-                      STAGE 4: PRE-SUBMISSION VERIFICATION SUMMARY
-                    </div>
-                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                      Category: <strong>{selectedCategoryObj?.name}</strong> · Location: <strong>{addressRef || "Pending location"}</strong>
-                    </div>
-                  </div>
-
                   <button
                     type="submit"
                     disabled={loading || !isDescribeValid || !isLocateValid}
                     className="button-primary"
                     style={{ width: "100%" }}
                   >
-                    {loading ? "Recording in ledger..." : "Submit public defect observation"}
+                    {loading ? "Submitting report..." : "Submit issue report"}
                   </button>
                 </form>
               </div>
             </div>
 
-            {/* Right Column: Evidentiary Standards Panel */}
+            {/* Practical Reporting Guidance Sidebar */}
             <div>
-              <SectionHeader index="02" title="Evidentiary standard" />
+              <SectionHeader title="Reporting guidance" />
 
               <div style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "var(--space-4)", fontSize: "12px" }}>
-                <h3 style={{ fontSize: "13px", margin: "0 0 var(--space-2)" }}>Corroboration protocol</h3>
+                <h3 style={{ fontSize: "13px", margin: "0 0 var(--space-2)", fontWeight: 600 }}>What makes a useful report?</h3>
                 <p style={{ color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 var(--space-3)" }}>
-                  CivicTrace uses geographic proximity clustering and category matching to correlate reports into shared investigation cases.
+                  Include clear details about the physical hazard: depth of potholes, width of cracks, active water flow, or obscured street signs.
                 </p>
 
-                <h3 style={{ fontSize: "13px", margin: "0 0 var(--space-2)" }}>Cryptographic accountability</h3>
+                <h3 style={{ fontSize: "13px", margin: "0 0 var(--space-2)", fontWeight: 600 }}>Location accuracy</h3>
                 <p style={{ color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 var(--space-3)" }}>
-                  Each submitted observation is hashed into an immutable append-only audit log. Operator actions must withstand independent community verification before closure.
+                  Use the browser GPS button when standing near the issue, or provide the nearest landmark intersection. Reports within 50 meters of existing issues are correlated to prevent duplicate tickets.
+                </p>
+
+                <h3 style={{ fontSize: "13px", margin: "0 0 var(--space-2)", fontWeight: 600 }}>Photographic evidence</h3>
+                <p style={{ color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 var(--space-3)" }}>
+                  A clear photo helps reviewers triage priority accurately and enables community members to verify when the repair is completed.
                 </p>
 
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-2)", color: "var(--text-muted)", fontSize: "11px" }}>

@@ -83,16 +83,38 @@ export interface DuplicateCandidate {
   target_case?: Case;
 }
 
+export interface RecurrenceRelationship {
+  id: string;
+  prior_case_id: string;
+  current_case_id: string;
+  distance_meters: number;
+  days_since_prior_resolution: number;
+  confidence_score: number;
+  explanation: string;
+  is_reviewer_confirmed: boolean;
+  created_at: string;
+  prior_case?: Case;
+  current_case?: Case;
+}
+
 export interface NeighborhoodStats {
   service_area: string;
   open_cases: number;
   verified_resolutions: number;
   disputed_resolutions: number;
+  reopened_cases?: number;
   awaiting_verification: number;
   total_reports: number;
   median_resolution_days: number;
   category_counts: Record<string, number>;
   priority_counts: Record<string, number>;
+  total_claims?: number;
+  verified_claims?: number;
+  disputed_claims?: number;
+  awaiting_claims?: number;
+  total_observations?: number;
+  confirmed_observations?: number;
+  dispute_observations?: number;
 }
 
 // Proactively eradicate any legacy tokens left in localStorage/sessionStorage by older CivicTrace versions
@@ -274,6 +296,7 @@ export const api = {
     }),
 
   getNeighborhoodStats: () => request<NeighborhoodStats>("/cases/neighborhood/stats"),
+  getRecurrences: () => request<RecurrenceRelationship[]>("/cases/recurrence/relationships"),
 
   // Auth
   login: async (email: string, pass: string) => {

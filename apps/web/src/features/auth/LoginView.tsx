@@ -42,15 +42,14 @@ export const LoginView: React.FC = () => {
   return (
     <>
       <PageHeading
-        index="00"
-        title="Portal Sign-In"
-        description="Authenticate with civic credentials or use demo identity keys. CivicTrace Portal Sign-In."
+        title="Sign in"
+        description="Sign in to access reviewer, operator, or citizen workflows."
       />
 
       <div className="workspace">
         <div style={{ maxWidth: "480px", margin: "20px auto" }}>
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "var(--space-5)" }}>
-            <SectionHeader index="01" title="CivicTrace Portal Sign-In" />
+            <SectionHeader title="CivicTrace Portal Sign-In" />
 
             {errorMsg && (
               <div role="alert" style={{ marginBottom: "var(--space-3)" }}>

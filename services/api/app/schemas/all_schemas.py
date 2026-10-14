@@ -263,6 +263,7 @@ class RecurrencePublic(BaseModel):
     is_reviewer_confirmed: bool
     created_at: datetime
     prior_case: Optional[CasePublic] = None
+    current_case: Optional[CasePublic] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -279,3 +280,10 @@ class NeighborhoodStats(BaseModel):
     median_resolution_days: float
     category_counts: Dict[str, int]
     priority_counts: Dict[str, int]
+    total_claims: Optional[int] = 0
+    verified_claims: Optional[int] = 0
+    disputed_claims: Optional[int] = 0
+    awaiting_claims: Optional[int] = 0
+    total_observations: Optional[int] = 0
+    confirmed_observations: Optional[int] = 0
+    dispute_observations: Optional[int] = 0

@@ -43,23 +43,21 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   };
 
   const navItems = [
-    { index: "01", name: "Overview", path: "/" },
-    { index: "02", name: "Cases", path: "/explorer" },
-    { index: "03", name: "Intelligence", path: "/neighborhood" },
-    { index: "04", name: "Report issue", path: "/report" },
+    { name: "Overview", path: "/" },
+    { name: "Cases", path: "/explorer" },
+    { name: "Intelligence", path: "/neighborhood" },
+    { name: "Report issue", path: "/report" },
   ];
 
   if (user && (user.role === "REVIEWER" || user.role === "ADMINISTRATOR")) {
     navItems.push({
-      index: String(navItems.length + 1).padStart(2, "0"),
       name: "Reviewer desk",
       path: "/reviewer",
     });
   }
   if (user && (user.role === "OPERATOR" || user.role === "ADMINISTRATOR")) {
     navItems.push({
-      index: String(navItems.length + 1).padStart(2, "0"),
-      name: "Operator terminal",
+      name: "Work orders",
       path: "/operator",
     });
   }
@@ -70,7 +68,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         Skip to workspace
       </a>
 
-      {/* Benchlight Light Sidebar */}
+      {/* CivicTrace Sidebar */}
       <aside className="app-sidebar">
         <Link to="/" className="brand">
           <CivicBeacon />
@@ -85,20 +83,17 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
               end={item.path === "/"}
               className={({ isActive }) => (isActive ? "active" : "")}
             >
-              <span className="nav-index" aria-hidden="true">
-                {item.index}
-              </span>
               <span>{item.name}</span>
             </NavLink>
           ))}
         </nav>
 
-        {/* Local Workspace Note / Status */}
+        {/* Workspace Session Status */}
         <div className="local-note">
           <span className="local-marker" aria-hidden="true" />
           {user ? user.display_name : "Local workspace"}
           <p>
-            {user ? `${user.role} session active` : "Indore Ward 34 · Offline ledger"}
+            {user ? `${user.role} session active` : "Indore Ward 34 service area"}
             <br />
             {user ? (
               <button
@@ -122,11 +117,11 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         {children}
       </main>
 
-      {/* Benchlight Application Status Bar */}
+      {/* CivicTrace Application Status Bar */}
       <footer className="app-status-bar">
-        <span className="status-context">Local SQLite Workspace</span>
+        <span className="status-context">CivicTrace</span>
         <span role="status">
-          SHA-256 Event Chain Active · Schematic Map Model (Indore Ward 34)
+          Public Infrastructure Accountability Ledger
         </span>
         <span className="status-version">
           v1.0.0

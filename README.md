@@ -13,7 +13,7 @@ Built for WarriorHacks 2.0 under the theme of civic infrastructure accountabilit
 ```
                       +---------------------------------------+
                       |       Citizen & Official Portal       |
-                      |   (React 18 + TypeScript + Vite)      |
+                      |   (React 19 + TypeScript + Vite)      |
                       +-------------------+-------------------+
                                           |
                                 HTTP / REST API (FastAPI)

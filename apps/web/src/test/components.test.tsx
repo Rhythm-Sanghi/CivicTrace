@@ -5,8 +5,8 @@ import { MemoryRouter } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { LoginView } from "../features/auth/LoginView";
 
-describe("Frontend Core Components & Benchlight Design System", () => {
-  it("renders AppShell brand, numbered navigation, and offline status footer", () => {
+describe("Frontend Core Components & Design System", () => {
+  it("renders AppShell brand, clean navigation, and factual status footer", () => {
     render(
       <MemoryRouter>
         <AppShell>
@@ -15,16 +15,12 @@ describe("Frontend Core Components & Benchlight Design System", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("CivicTrace")).toBeInTheDocument();
-    expect(screen.getByText("01")).toBeInTheDocument();
+    expect(screen.getAllByText("CivicTrace").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Overview")).toBeInTheDocument();
-    expect(screen.getByText("02")).toBeInTheDocument();
     expect(screen.getByText("Cases")).toBeInTheDocument();
-    expect(screen.getByText("03")).toBeInTheDocument();
     expect(screen.getByText("Intelligence")).toBeInTheDocument();
-    expect(screen.getByText("04")).toBeInTheDocument();
     expect(screen.getByText("Report issue")).toBeInTheDocument();
-    expect(screen.getByText("Local SQLite Workspace")).toBeInTheDocument();
+    expect(screen.getByText("Public Infrastructure Accountability Ledger")).toBeInTheDocument();
     expect(screen.getByText("Child workspace")).toBeInTheDocument();
   });
 
