@@ -96,13 +96,18 @@ class DuplicateDetectionEngine:
 
         if report_dt and case_dt:
             diff_days = abs((report_dt - case_dt).total_seconds()) / 86400.0
+            has_timestamps = True
         else:
-            diff_days = 0.0
+            diff_days = None
+            has_timestamps = False
 
-        if diff_days <= cls.MAX_TEMPORAL_DAYS:
-            temporal_score = max(0.0, 1.0 - (diff_days / cls.MAX_TEMPORAL_DAYS))
+        if has_timestamps and diff_days is not None:
+            if diff_days <= cls.MAX_TEMPORAL_DAYS:
+                temporal_score = max(0.0, 1.0 - (diff_days / cls.MAX_TEMPORAL_DAYS))
+            else:
+                temporal_score = 0.1
         else:
-            temporal_score = 0.1
+            temporal_score = 0.5
 
         # Composite score
         # 35% spatial, 30% text, 20% category, 15% temporal
@@ -133,7 +138,7 @@ class DuplicateDetectionEngine:
                 f"Moderate vocabulary overlap in issue description ({text_score * 100:.0f}%)"
             )
 
-        if diff_days < 7:
+        if has_timestamps and diff_days is not None and diff_days < 7:
             reasons.append(f"Recent concurrent activity ({diff_days:.1f} days apart)")
 
         explanation = {

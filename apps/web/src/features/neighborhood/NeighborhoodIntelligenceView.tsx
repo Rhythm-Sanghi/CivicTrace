@@ -112,6 +112,9 @@ export const NeighborhoodIntelligenceView: React.FC = () => {
   const disputedClaims = stats?.disputed_claims ?? 0;
   const awaitingClaims = stats?.awaiting_claims ?? 0;
 
+  const confirmedCount = recurrences.filter((r) => r.is_reviewer_confirmed).length;
+  const candidateCount = recurrences.filter((r) => !r.is_reviewer_confirmed).length;
+
   const verifRate = totalClaims > 0
     ? `${((verifiedClaims / totalClaims) * 100).toFixed(0)}%`
     : "—";
@@ -268,7 +271,15 @@ export const NeighborhoodIntelligenceView: React.FC = () => {
           <div>
             <SectionHeader
               title="Claim verification & recurrence"
-              actionText={recurrences.length > 0 ? `${recurrences.length} confirmed recurring` : undefined}
+              actionText={
+                recurrences.length > 0
+                  ? confirmedCount > 0 && candidateCount > 0
+                    ? `${confirmedCount} confirmed · ${candidateCount} candidates`
+                    : confirmedCount > 0
+                    ? `${confirmedCount} confirmed recurring`
+                    : `${candidateCount} recurrence candidate${candidateCount > 1 ? "s" : ""}`
+                  : undefined
+              }
             />
 
             <div style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "var(--space-4)" }}>
@@ -301,7 +312,7 @@ export const NeighborhoodIntelligenceView: React.FC = () => {
 
               {/* Recurrence Window Section (60 days per backend engine policy) */}
               <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "var(--space-2)", fontWeight: 600 }}>
-                CONFIRMED RECURRING ISSUES (&lt; 60 DAYS RE-EMERGENCE)
+                RECURRENCE CANDIDATES & CONFIRMED RE-EMERGENCE (&lt; 60 DAYS)
               </div>
 
               {recurrences.length > 0 ? (
@@ -318,14 +329,25 @@ export const NeighborhoodIntelligenceView: React.FC = () => {
                         style={{
                           padding: "var(--space-2) var(--space-3)",
                           border: "1px solid var(--border)",
-                          borderLeft: "3px solid var(--warning)",
+                          borderLeft: rel.is_reviewer_confirmed
+                            ? "3px solid var(--success)"
+                            : "3px solid var(--border-focus)",
                           background: "var(--surface-muted)",
                         }}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px" }}>
                           <code style={{ fontSize: "11px", fontWeight: 600 }}>{caseRef}</code>
-                          <span style={{ fontSize: "10px", color: "var(--warning)", fontWeight: 600 }}>
-                            {rel.is_reviewer_confirmed ? "REVIEWER CONFIRMED" : "MATHEMATICALLY CONFIRMED"}
+                          <span
+                            style={{
+                              fontSize: "10px",
+                              fontWeight: 600,
+                              color: rel.is_reviewer_confirmed ? "var(--success)" : "var(--text-secondary)",
+                              border: `1px solid ${rel.is_reviewer_confirmed ? "var(--success)" : "var(--border)"}`,
+                              padding: "1px 5px",
+                              borderRadius: "2px",
+                            }}
+                          >
+                            {rel.is_reviewer_confirmed ? "REVIEWER CONFIRMED" : "DETECTED CANDIDATE"}
                           </span>
                         </div>
                         <div style={{ fontWeight: 600, fontSize: "13px", marginTop: "4px" }}>
@@ -334,7 +356,8 @@ export const NeighborhoodIntelligenceView: React.FC = () => {
                           </Link>
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>
-                          {caseAddr} · Resolved {rel.days_since_prior_resolution}d prior ({rel.distance_meters.toFixed(0)}m distance)
+                          {caseAddr} · Resolved {rel.days_since_prior_resolution}d prior ({rel.distance_meters.toFixed(0)}m distance) ·{" "}
+                          {rel.is_reviewer_confirmed ? "Independent reviewer verified" : "Proximity algorithm candidate"}
                         </div>
                       </div>
                     );
