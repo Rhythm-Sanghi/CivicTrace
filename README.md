@@ -1,12 +1,8 @@
 # CivicTrace
 
-> A public record of problems worth fixing.
+CivicTrace tracks a road, drainage, or other infrastructure report from its initial evidence through a proposed repair. Residents can inspect the case history and verify or dispute a resolution. The app keeps a signed record of case events and groups reports that may describe the same issue.
 
-CivicTrace is an open-source, evidence-oriented civic infrastructure investigation system. Traditional municipal ticketing tools allow issues to disappear into an unverifiable "Closed" status. CivicTrace replaces opaque ticket updates with an **append-only cryptographic event ledger**, **deterministic spatial-textual duplicate correlation**, and **independent citizen verification gates**.
-
-Built for WarriorHacks 2.0 under the theme of civic infrastructure accountability.
-
----
+Built for WarriorHacks 2.0. Try the seeded case lifecycle or look through the [screenshots](#visual-interface--screenshots).
 
 ## System Overview
 
@@ -50,7 +46,7 @@ CivicTrace follows the **Workshop + Gridline + Studio Utility** visual identity:
 
 ---
 
-## Core Differentiators
+## Case evidence and verification
 
 | Standard Complaint Ticketing | CivicTrace Evidence Platform |
 | :--- | :--- |
@@ -62,13 +58,13 @@ CivicTrace follows the **Workshop + Gridline + Studio Utility** visual identity:
 
 ---
 
-## Quick Start (Local Development)
+## Run locally
 
 CivicTrace requires zero paid APIs, zero cloud AI subscriptions, and no mandatory Docker containers for development.
 
 ### Prerequisites
 - **Python 3.11+**
-- **Node.js 18+ & npm**
+- **Node.js 22.12+ and npm**
 
 ### 1. Backend Setup
 
@@ -87,11 +83,11 @@ source .venv/bin/activate
 # 3. Install backend dependencies:
 pip install -r services/api/requirements.txt
 
-# 4. Initialize environment configuration:
-cp .env.example .env
+# 4. Configure the API from its working directory:
+cd services/api
+cp ../../.env.example .env
 
 # 5. Seed demonstration accounts and scenarios:
-cd services/api
 python -m app.db.seed
 
 # 6. Start the FastAPI development server:
@@ -110,7 +106,7 @@ In a separate terminal window:
 cd apps/web
 
 # 1. Install dependencies:
-npm install
+npm ci
 
 # 2. Start the Vite development server:
 npm run dev
